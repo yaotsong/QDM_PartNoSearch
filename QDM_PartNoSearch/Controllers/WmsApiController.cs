@@ -26,7 +26,7 @@ namespace QDM_PartNoSearch.Controllers
         {
             try
             {
-                string apiUrl = "http://192.168.1.100/api_v1/token/authorize.php";
+                string apiUrl = "https://reyi-distribution.wms.changliu.com.tw/api_v1/token/authorize.php";
 
                 // 創建認證header
                 string authString = $"{_apiId}:{_apiKey}";
