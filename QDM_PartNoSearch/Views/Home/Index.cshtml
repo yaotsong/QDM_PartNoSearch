@@ -1,0 +1,160 @@
+﻿@{
+    ViewData["Title"] = "轉換料號查詢";
+}
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.3/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js" defer></script>
+
+<div class="container mt-4">
+    <h3 class="mb-4">轉換料號查詢</h3>
+    <form id="dynamicForm">
+        <div id="inputContainer">
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-5 mb-2 mb-md-0">
+                    <div class="d-inline-flex col-12">
+                        <div class="col-4" style="margin-top:3px;text-align:right">料品</div>
+                        <select class="form-select select2 col-8" name="partNumber[]">
+                            <option value="">請選擇料品</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-5 mb-2 mb-md-0">
+                    <div class="d-inline-flex col-12">
+                        <div class="col-3" style="margin-top:5px;text-align:right">數量</div>
+                        <div class="col-9"><input type="number" class="form-control" name="quantity[]" placeholder="請輸入數量" min="0"></div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-success w-100 add-input" type="button">
+                        <i class="fas fa-plus"></i> 新增
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-3">
+                <button type="button" id="generateButton" class="btn btn-success w-100">產出</button>
+            </div>
+            <div class="col-md-7"></div>
+            <div class="col-md-2">
+                <button type="button" id="clearButton" class="btn btn-warning w-100">清除</button>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <input type="text" id="resultTextInput" class="form-control" readonly><br />
+                <input type="text" id="resultIdInput" class="form-control" readonly>
+            </div>
+        </div>
+    </form>
+</div>
+<script>
+    $(document).ready(function () {
+        initializeSelect2();
+        
+        // 使用事件委派來綁定新增和刪除按鈕
+        $('#inputContainer').on('click', '.add-input', addInput);
+        $('#inputContainer').on('click', '.btn-danger', removeInput);
+        // 新增產出按鈕的點擊事件
+        $('#generateButton').on('click', generateResult);
+        $('#clearButton').on('click', clearForm);
+    });
+
+    function initializeSelect2(selectElement) {
+        var $select = selectElement ? $(selectElement) : $('.select2');
+        $select.select2({
+            placeholder: "請選擇料品",
+            allowClear: true,
+            ajax: {
+                url: '/Home/GetPartNumbers',
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        q: params.term
+                    };
+                },
+                processResults: function (data) {
+                    return {
+                        results: data
+                    };
+                },
+                cache: false
+            },
+            minimumInputLength: 1
+        });
+    }
+
+    function addInput() {
+        var container = document.getElementById('inputContainer');
+        var newRow = document.createElement('div');
+        newRow.className = 'row mb-3 align-items-center';
+        newRow.innerHTML = `
+                <div class="col-md-5 mb-2 mb-md-0">
+                    <div class="d-inline-flex col-12">
+                        <div class="col-4" style="margin-top:3px;text-align:right">料品</div>
+                        <select class="form-select select2 col-8" name="partNumber[]">
+                            <option value="">請選擇料品</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-5 mb-2 mb-md-0">
+                    <div class="d-inline-flex col-12">
+                        <div class="col-3" style="margin-top:5px;text-align:right">數量</div>
+                        <div class="col-9"><input type="number" class="form-control" name="quantity[]" placeholder="請輸入數量" min="0"></div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-danger w-100" type="button">
+                        <i class="fas fa-minus"></i> 刪除
+                    </button>
+                </div>
+            `;
+        container.appendChild(newRow);
+        initializeSelect2($(newRow).find('.select2'));
+    }
+
+    function clearForm() {
+        // 移除除了第一行以外的所有輸入行
+        $('#inputContainer .row:not(:first)').remove();
+
+        // 清空第一行的選擇和輸入
+        var firstRow = $('#inputContainer .row:first');
+        firstRow.find('select').val(null).trigger('change');
+        firstRow.find('input[type="number"]').val('');
+
+        // 清空結果輸入框
+        $('#resultTextInput').val('');
+        $('#resultIdInput').val('');
+    }
+
+    function removeInput() {
+        $(this).closest('.row').remove();
+    }
+
+    function generateResult() {
+        var result = [];
+        var idResult = [];
+        $('#inputContainer .row').each(function () {
+            var selectElement = $(this).find('select[name="partNumber[]"]');
+            var quantityElement = $(this).find('input[name="quantity[]"]');
+
+            var selectedId = selectElement.val().trim();
+            var selectedText = selectElement.find('option:selected').text();
+            var quantity = quantityElement.val();
+
+            if (selectedId && quantity) {
+                result.push(selectedText + '*' + quantity);
+                idResult.push(selectedId + '*' + quantity);
+            }
+        });
+
+        var displayResult = result.join('+');
+        var idDisplayResult = idResult.join('+');
+
+        $('#resultTextInput').val(displayResult); 
+        $('#resultIdInput').val(idDisplayResult);
+    }
+</script>

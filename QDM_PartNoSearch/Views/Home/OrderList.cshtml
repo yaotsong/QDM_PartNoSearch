@@ -1,0 +1,20 @@
+﻿@{
+    ViewData["Title"] = "OrderList";
+}
+
+@model IEnumerable<QDM_PartNoSearch.Models.Invmb>
+
+<h1>@ViewData["Title"]</h1>
+
+<table id="memberlist" class="table table-bordered">
+    <tbody>
+        @foreach (var items in Model)
+        {
+            <tr>
+                <td>@items.Mb001</td>
+                <td>@items.Mb002</td>
+
+            </tr>
+        }
+    </tbody>
+</table>

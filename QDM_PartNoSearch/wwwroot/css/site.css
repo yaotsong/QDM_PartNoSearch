@@ -1,0 +1,95 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+
+.wrapper {
+    display: flex;
+    align-items: stretch;
+    min-height: 100vh;
+}
+
+#content {
+    width: 100%;
+    padding: 20px;
+    transition: all 0.3s;
+    flex: 1;
+}
+
+.arrow-icon {
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+    border-right: 10px solid #000; /* 箭頭顏色 */
+}
+
+#sidebar.active + #content .arrow-icon {
+    border-right: 0;
+    border-left: 10px solid #000;
+}
+/*側邊欄*/
+#sidebar {
+    position: relative;
+    min-width: 250px;
+    max-width: 250px;
+    transition: all 0.3s;
+    box-shadow: 3px 0 6px rgba(0,0,0,0.1);
+    z-index: 1000;
+    background-color: #f8f9fa;
+}
+
+#sidebar.active {
+    margin-left: -250px;
+}
+
+/*側邊欄箭頭收合&位置*/
+#sidebarCollapse {
+    position: absolute;
+    top: 10px;
+    right: -30px;
+    background-color: #f8f9fa;
+    border: none;
+    border-radius: 0 4px 4px 0;
+    padding: 10px;
+    box-shadow: 3px 0 5px rgba(0,0,0,0.1);
+    z-index: 1001;
+}
+
+#sidebarCollapse:hover {
+    background-color: #e9ecef;
+}
+
+#sidebar.active {
+    margin-left: -220px; /* 調整收起時的邊距，留出按鈕的寬度 */
+}
+
+#sidebar.active #sidebarCollapse {
+    right: -30px; /* 調整收起時按鈕的位置 */
+}
