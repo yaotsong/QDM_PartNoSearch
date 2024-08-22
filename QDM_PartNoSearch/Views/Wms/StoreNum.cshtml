@@ -1,83 +1,15 @@
 ﻿@{
     ViewData["Title"] = "庫存查詢";
 }
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<div class="container mt-4">
-    <h3>@ViewData["Title"]</h3>
-    <button id="getTokenButton">獲取 Token</button>
-</div>
+@{
+    var accessToken = ViewBag.AccessToken as string;
+}
 
-
-<script>
-    // 設定API_ID和API_KEY
-    const API_ID = '7f975a56c7-xzpv-4i6e-90p8-3nbigh';
-    const API_KEY = 'HQtLryJ1S1gk5104nKa3EEIU5V0hYj22wg6gv6J22g6p1e7PD1yEn1BxecKY30UH';
-
-    // 將API_ID和API_KEY連接並進行Base64編碼
-    const credentials = btoa(API_ID + ':' + API_KEY);
-
-    // 當按鈕被點擊時發送請求
-    $('#getTokenButton').click(function () {
-        $.ajax({
-            url: 'http://192.168.1.100/api_v1/token/authorize.php', // 使用 HTTPS
-            type: 'GET',
-            headers: {
-                'Authorization': 'Basic ' + credentials
-            },
-            xhrFields: {
-                withCredentials: true // 允許跨域請求攜帶憑證
-            },
-            success: function (response) {
-                try {
-                    const accessToken = response.access_token;
-                    if (!accessToken) {
-                        throw new Error('Access token not found in response');
-                    }
-                    console.log('Access Token:', accessToken);
-                    localStorage.setItem('accessToken', accessToken);
-
-                    // 設定計時器清除 token
-                    setTimeout(function () {
-                        localStorage.removeItem('accessToken');
-                        console.log('Access token has been removed');
-                    }, 3600000);
-
-                    alert('Token 獲取成功！');
-                } catch (e) {
-                    console.error('Error processing response:', e);
-                    alert('處理響應時發生錯誤，請查看控制台了解詳情。');
-                }
-            },
-            error: function (xhr, status, error) {
-                console.error('Error:', error);
-                console.log('Status:', status);
-                console.log('Response:', xhr.responseText);
-                alert('獲取 Token 失敗，請查看控制台了解詳情。');
-            }
-        });
-    });
-
-    // 範例：如何在後續的API請求中使用access_token
-    function makeApiRequest(endpoint) {
-        const accessToken = localStorage.getItem('accessToken');
-        if (!accessToken) {
-            console.error('No access token available');
-            alert('沒有可用的 access token，請先獲取 token。');
-            return;
-        }
-
-        $.ajax({
-            url: 'http://192.168.1.100/api_v1/' + endpoint,
-            type: 'GET',
-            headers: {
-                'Authorization': 'Bearer ' + accessToken
-            },
-            success: function (response) {
-                console.log('API Response:', response);
-            },
-            error: function (xhr, status, error) {
-                console.error('API Error:', error);
-            }
-        });
-    }
-</script>
+@if (!string.IsNullOrEmpty(accessToken) && !accessToken.StartsWith("無法") && !accessToken.StartsWith("發生錯誤"))
+{
+    <p>Access Token: @accessToken</p>
+}
+else
+{
+    <p>@accessToken</p>
+}
