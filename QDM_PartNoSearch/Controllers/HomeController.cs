@@ -28,10 +28,7 @@ namespace QDM_PartNoSearch.Controllers
             return View();
         }
 
-        public IActionResult StoreNum()
-        {
-            return View();
-        }
+     
 
         //index頁面查詢料號
         public IActionResult GetPartNumbers(string q)

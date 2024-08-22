@@ -1,19 +1,16 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using System.Text;
+﻿using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using System.Text;
 
 namespace QDM_PartNoSearch.Controllers
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class WmsApiController : Controller
+    public class WmsController : Controller
     {
         private readonly HttpClient _httpClient;
         private readonly string _apiId;
         private readonly string _apiKey;
 
-        public WmsApiController(IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        public WmsController(IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
             _httpClient = httpClientFactory.CreateClient();
             _apiId = configuration["ApiSettings:ApiId"];
@@ -63,5 +60,11 @@ namespace QDM_PartNoSearch.Controllers
                 return StatusCode(500, $"發生錯誤: {ex.Message}");
             }
         }
+        public IActionResult StoreNum()
+        {
+            var test = CallExternalApi();
+            return View();
+        }
     }
 }
+
