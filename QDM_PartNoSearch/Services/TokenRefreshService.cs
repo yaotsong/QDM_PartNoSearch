@@ -1,25 +1,28 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+
 namespace QDM_PartNoSearch.Services
 {
     public class TokenRefreshService : IHostedService, IDisposable
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<TokenRefreshService> _logger;
+        private readonly IMemoryCache _cache;
         private Timer _timer;
-        private string _accessToken;
         private readonly string _apiId;
         private readonly string _apiKey;
 
-        public TokenRefreshService(IHttpClientFactory httpClientFactory, ILogger<TokenRefreshService> logger, IConfiguration configuration)
+        public TokenRefreshService(IHttpClientFactory httpClientFactory, ILogger<TokenRefreshService> logger, IMemoryCache cache, IConfiguration configuration)
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
+            _cache = cache;
             _apiId = configuration["ApiSettings:ApiId"];
             _apiKey = configuration["ApiSettings:ApiKey"];
         }
@@ -37,8 +40,8 @@ namespace QDM_PartNoSearch.Services
             {
                 var httpClient = _httpClientFactory.CreateClient();
                 string apiUrl = "https://reyi-distribution.wms.changliu.com.tw/api_v1/token/authorize.php";
-                string apiId = _apiId;  // Replace with actual API ID
-                string apiKey = _apiKey;  // Replace with actual API Key
+                string apiId = _apiId;
+                string apiKey = _apiKey;
 
                 // Create authorization header
                 string authString = $"{apiId}:{apiKey}";
@@ -55,8 +58,9 @@ namespace QDM_PartNoSearch.Services
                         if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement) &&
                             dataElement.TryGetProperty("access_token", out JsonElement accessTokenElement))
                         {
-                            _accessToken = accessTokenElement.GetString();
-                            _logger.LogInformation($"Access token refreshed: {_accessToken}");
+                            string accessToken = accessTokenElement.GetString();
+                            _cache.Set("AccessToken", accessToken, TimeSpan.FromHours(1)); // Store in cache with 1 hour expiration
+                            _logger.LogInformation($"Access token refreshed and cached: {accessToken}");
                         }
                         else
                         {
@@ -88,4 +92,3 @@ namespace QDM_PartNoSearch.Services
         }
     }
 }
-
