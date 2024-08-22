@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QDM_PartNoSearch.Models;
+using QDM_PartNoSearch.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +10,10 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<Flavor2Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DBContext")));
 // 添加服務到容器裡
 builder.Services.AddHttpClient();
+builder.Services.AddMemoryCache(); // 添加內存緩存服務
+
+// 註冊 TokenRefreshService
+builder.Services.AddHostedService<TokenRefreshService>();
 
 var app = builder.Build();
 
