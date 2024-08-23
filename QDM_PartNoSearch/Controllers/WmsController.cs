@@ -23,9 +23,9 @@ namespace QDM_PartNoSearch.Controllers
             _cache = cache;
             _logger = logger;
         }
-        public List<WmsApi> allData = new List<WmsApi>();
+        public List<WmsProduct> allData = new List<WmsProduct>();
         //api抓頁面筆數用，ex:查詢商場商品資料、訂單查詢
-        public async Task<List<WmsApi>> GetAllDataAsync(string apiName)
+        public async Task<List<WmsProduct>> GetAllDataAsync(string apiName)
         {
             int currentPage = 1;
             int maxPage;
@@ -49,9 +49,9 @@ namespace QDM_PartNoSearch.Controllers
             return allData;
         }
         //api抓庫存用，ex:查詢商品庫存
-        public async Task<List<WmsApi>> GetStockDataAsync(List<WmsApi> data)
+        public async Task<List<WmsProduct>> GetStockDataAsync(List<WmsProduct> data)
         {
-            var responsesList = new List<WmsApi>();
+            var responsesList = new List<WmsProduct>();
 
             if (data.Any())
             {
@@ -96,7 +96,7 @@ namespace QDM_PartNoSearch.Controllers
         private async Task<PageDataResponse> GetPageDataAsync(string apiName, int pageNumber, string skuString = "")
         {
             var url = "";
-            var resultList = new List<WmsApi>();
+            var resultList = new List<WmsProduct>();
             if (_cache.TryGetValue("AccessToken", out string _accessToken))
             {
                 try
@@ -140,7 +140,7 @@ namespace QDM_PartNoSearch.Controllers
                                                 string name = nameElement.GetString();
                                                 //int stock = 
                                                 // 創建 WmsApi 物件並設置屬性
-                                                var wmsApi = new WmsApi
+                                                var wmsApi = new WmsProduct
                                                 {
                                                     Id = id,
                                                     Name = name,
@@ -162,7 +162,7 @@ namespace QDM_PartNoSearch.Controllers
                                                 string sku = skuElement.GetString();
                                                 int stock = stockElement.GetInt32();
                                                 string name = nameElement.ToString();
-                                                var wmsApi = new WmsApi
+                                                var wmsApi = new WmsProduct
                                                 {
                                                     Id = sku,
                                                     Name = name,
@@ -210,11 +210,11 @@ namespace QDM_PartNoSearch.Controllers
 
         public class PageDataResponse
         {
-            public List<WmsApi> Data { get; set; }
+            public List<WmsProduct> Data { get; set; }
             public int MaxPage { get; set; }
         }
         //將撈到的商品list，依照50筆拆分出字串
-        public static List<string> GroupIds(List<WmsApi> allData, int groupSize = 50)
+        public static List<string> GroupIds(List<WmsProduct> allData, int groupSize = 50)
         {
             // 提取所有 Id
             List<string> ids = allData.Select(x => x.Id).ToList();

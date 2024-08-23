@@ -1,6 +1,6 @@
 ﻿namespace QDM_PartNoSearch.Models
 {
-    public class WmsApi
+    public class WmsProduct
     {
         //SKU
         public string Id { get; set; }
