@@ -1,124 +1,189 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using System.Text;
+using Microsoft.Extensions.Caching.Memory;
+using Azure.Core;
+using System.Net.Http;
+using QDM_PartNoSearch.Models;
 
 namespace QDM_PartNoSearch.Controllers
 {
     public class WmsController : Controller
     {
         private readonly HttpClient _httpClient;
-        private readonly string _apiId;
-        private readonly string _apiKey;
-        private readonly string _accessToken;
+        private readonly IMemoryCache _cache;
+        private readonly ILogger<WmsController> _logger;
 
-        public WmsController(IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        public WmsController(IHttpClientFactory httpClientFactory, IMemoryCache cache, ILogger<WmsController> logger)
         {
             _httpClient = httpClientFactory.CreateClient();
-            _apiId = configuration["ApiSettings:ApiId"];
-            _apiKey = configuration["ApiSettings:ApiKey"];
-
+            _cache = cache;
+            _logger = logger;
         }
-
-        //取得暢流accesstoken
-        [HttpGet]
-        public async Task<string> CallAccessTokenApi()
+        public async Task<List<string>> GetAllDataAsync()
         {
-            try
+            var allData = new List<string>();
+            int currentPage = 1;
+            int maxPage;
+            string apiName = "條件式篩選商品";
+            do
             {
-                string apiUrl = "https://reyi-distribution.wms.changliu.com.tw/api_v1/token/authorize.php";
-
-                // 創建認證 header
-                string authString = $"{_apiId}:{_apiKey}";
-                string base64AuthString = Convert.ToBase64String(Encoding.UTF8.GetBytes(authString));
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", base64AuthString);
-
-                HttpResponseMessage response = await _httpClient.GetAsync(apiUrl);
-
-                if (response.IsSuccessStatusCode)
+                var pageData = await GetPageDataAsync(apiName, currentPage);
+                if (pageData == null)
                 {
-                    string content = await response.Content.ReadAsStringAsync();
-                    using (JsonDocument doc = JsonDocument.Parse(content))
+                    _logger.LogError("Failed to retrieve data for page {PageNumber}", currentPage);
+                    break;
+                }
+
+                allData.AddRange(pageData.Data); // Assume `Data` is a list of `YourDataType` in your API response
+
+                maxPage = pageData.MaxPage; // Get the max page number from the response
+                currentPage++;
+            }
+            while (currentPage <= maxPage);
+
+            return allData;
+        }
+        // 全域變數來存儲提取的資料
+         public List<string> ResultList { get; private set; } = new List<string>();
+        private async Task<PageDataResponse> GetPageDataAsync(string apiurl, int pageNumber)
+        {
+            var url = "";
+            var resultList = new List<string>();
+            if (_cache.TryGetValue("AccessToken", out string _accessToken))
+            {
+                try
+                {
+                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+                    switch (apiurl)
                     {
-                        if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement) &&
-                            dataElement.TryGetProperty("access_token", out JsonElement accessTokenElement))
+                        case "條件式篩選商品":
+                            url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/product/pro_query.php?nowpage={pageNumber}&pagesize=100";
+                            break;
+                        default:
+                            url = "";
+                            break;
+                    }
+                    HttpResponseMessage response = await _httpClient.GetAsync(url);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string content = await response.Content.ReadAsStringAsync();
+                        using (JsonDocument doc = JsonDocument.Parse(content))
                         {
-                            return accessTokenElement.GetString();
-                        }
-                        else
-                        {
-                            return "無法在響應中找到 access_token";
+                            var pageDataResponse = new PageDataResponse();
+
+                            if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement))
+                            {
+                                if (dataElement.TryGetProperty("rows", out JsonElement rowsElement) && rowsElement.ValueKind == JsonValueKind.Array)
+                                {
+                                    // 遍歷 rows 陣列
+                                    foreach (var row in rowsElement.EnumerateArray())
+                                    {
+                                        // 提取 id 和 name
+                                        if (row.TryGetProperty("id", out JsonElement idElement) &&
+                                            row.TryGetProperty("name", out JsonElement nameElement))
+                                        {
+                                            string id = idElement.GetString();
+                                            string name = nameElement.GetString();
+
+                                            // 將 id 和 name 存儲到 List 中
+                                            resultList.Add($"ID: {id}, Name: {name}");
+                                            pageDataResponse.Data = resultList;
+                                        }
+                                    }
+                                }
+
+                                if (dataElement.TryGetProperty("maxpage", out JsonElement maxPageElement))
+                                {
+                                    pageDataResponse.MaxPage = maxPageElement.GetInt32();
+                                }
+                            }
+                            
+                            return pageDataResponse;
                         }
                     }
-                }
-                else
-                {
-                    // 返回失敗信息
-                    return $"API 呼叫失敗: {response.ReasonPhrase}";
-                }
-            }
-            catch (Exception ex)
-            {
-                // 返回錯誤信息
-                return $"發生錯誤: {ex.Message}";
-            }
-        }
-        [HttpGet]
-        public async Task<IActionResult> CountPageNum(string url)
-        {
-            try
-            {
-                string apiUrl = url;
-
-                // 獲取token
-                string accessToken = await CallAccessTokenApi();
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-
-                HttpResponseMessage response = await _httpClient.GetAsync(apiUrl);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    string content = await response.Content.ReadAsStringAsync();
-                    using (JsonDocument doc = JsonDocument.Parse(content))
+                    else
                     {
-                        JsonElement root = doc.RootElement;
-                        // 檢查是否包含 "data" 屬性
-                        if (root.TryGetProperty("data", out JsonElement dataElement) &&
-                            dataElement.TryGetProperty("maxpage", out JsonElement maxPageElement))
-                        {
-                            // 獲取 maxpage 的值
-                            int maxPage = maxPageElement.GetInt32();
-
-                            return Ok($"Max Page: {maxPage}");
-                        }
-                        else
-                        {
-                            // 如果 "data" 或 "maxpage" 屬性不存在，返回相應錯誤信息
-                            return BadRequest("無法在響應中找到 'data' 或 'maxpage'");
-                        }
-
+                        _logger.LogError("API call failed: {ReasonPhrase}", response.ReasonPhrase);
+                        return null;
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    // 返回失敗信息
-                    return NotFound($"API 呼叫失敗: {response.ReasonPhrase}");
+                    _logger.LogError("Error occurred while making API call: {Message}", ex.Message);
+                    return null;
                 }
             }
-            catch (Exception ex)
+            else
             {
-                // 返回錯誤信息
-                return NotFound($"發生錯誤: {ex.Message}");
+                _logger.LogWarning("Access token not found in cache.");
+                return null;
             }
         }
 
-        public async Task<IActionResult> StoreNum()
+        public class PageDataResponse
         {
-            // 呼叫 CallExternalApi 方法並獲取 accessToken
-            string accessToken = await CallAccessTokenApi();
+            public List<string> Data { get; set; }
+            public int MaxPage { get; set; }
+        }
 
-            // 將 accessToken 儲存在 ViewBag 中，以便在視圖中使用
-            ViewBag.AccessToken = accessToken;
+        [HttpGet]
+        public async Task<IActionResult> GetApiInfo(string url)
+        {
+            if (_cache.TryGetValue("AccessToken", out string? accessToken))
+            {
+                try
+                {
+                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
+                    HttpResponseMessage response = await _httpClient.GetAsync(url);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string content = await response.Content.ReadAsStringAsync();
+                        using (JsonDocument doc = JsonDocument.Parse(content))
+                        {
+                            JsonElement root = doc.RootElement;
+                            // 檢查是否包含 "data" 屬性
+                            if (root.TryGetProperty("data", out JsonElement dataElement) &&
+                                dataElement.TryGetProperty("maxpage", out JsonElement maxPageElement))
+                            {
+                                // 先獲取 maxpage 的值，再去call對應的apiAction
+                                int maxPage = maxPageElement.GetInt32();
+
+                                return Ok($"Max Page: {maxPage}");
+                            }
+                            else
+                            {
+                                // 如果 "data" 或 "maxpage" 屬性不存在，返回相應錯誤信息
+                                return BadRequest("無法在響應中找到 'data' 或 'maxpage'");
+                            }
+
+                        }
+                    }
+                    else
+                    {
+                        // 返回失敗信息
+                        return NotFound($"API 呼叫失敗: {response.ReasonPhrase}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // 返回錯誤信息
+                    return NotFound($"發生錯誤: {ex.Message}");
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Access token not found in cache.");
+                return StatusCode(500, "Access token not found in cache.");
+            }
+        }
+
+        public IActionResult StoreNum()
+        {
+            Task<List<string>> task = GetAllDataAsync();
             return View();
         }
 
