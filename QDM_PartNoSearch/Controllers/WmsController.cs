@@ -7,6 +7,7 @@ using System.Net.Http;
 using QDM_PartNoSearch.Models;
 using System.Text.Json.Serialization;
 using System.Globalization;
+using System.Threading.Tasks;
 
 namespace QDM_PartNoSearch.Controllers
 {
@@ -50,21 +51,49 @@ namespace QDM_PartNoSearch.Controllers
         //api抓庫存用，ex:查詢商品庫存
         public async Task<List<WmsApi>> GetStockDataAsync(List<WmsApi> data)
         {
+            var responsesList = new List<WmsApi>();
+
             if (data.Any())
             {
-                var AllSkuData = GroupIds(data);
-                foreach (var item in AllSkuData)
-                {
-                    GetPageDataAsync("查詢庫存", 1, item);
-                }
-                
-            }
-            
+                var allSkuData = GroupIds(data);
+                var tasks = new List<Task<PageDataResponse>>();
 
-            return allData;
+                // 建立所有異步任務
+                foreach (var item in allSkuData)
+                {
+                    tasks.Add(GetPageDataAsync("查詢庫存", 1, item));
+                }
+
+                // 等待所有異步操作完成
+                var responses = await Task.WhenAll(tasks);
+
+                // 合併所有查詢結果
+                foreach (var response in responses)
+                {
+                    if (response?.Data != null)
+                    {
+                        responsesList.AddRange(response.Data);
+                    }
+                }
+            }
+
+            // 將庫存數據存儲到字典中以便快速查詢
+            var stockDictionary = responsesList.ToDictionary(b => b.Id, b => b.Stock);
+
+            // 更新 allData 列表中的庫存數據
+            foreach (var allItem in data)
+            {
+                if (stockDictionary.TryGetValue(allItem.Id, out var stock))
+                {
+                    allItem.Stock = stock;
+                }
+            }
+
+            return data;
         }
 
-        private async Task<PageDataResponse> GetPageDataAsync(string apiName, int pageNumber, string skuString="")
+
+        private async Task<PageDataResponse> GetPageDataAsync(string apiName, int pageNumber, string skuString = "")
         {
             var url = "";
             var resultList = new List<WmsApi>();
@@ -101,46 +130,62 @@ namespace QDM_PartNoSearch.Controllers
                                     // 遍歷 rows 陣列
                                     foreach (var row in rowsElement.EnumerateArray())
                                     {
-                                        
-                                        // 提取 id 和 name
-                                        if (row.TryGetProperty("id", out JsonElement idElement) &&
-                                            row.TryGetProperty("name", out JsonElement nameElement))
+                                        if (apiName == "條件式篩選商品")
                                         {
-                                            string id = idElement.GetString();
-                                            string name = nameElement.GetString();
-                                            //int stock = 
-                                            // 創建 WmsApi 物件並設置屬性
-                                            var wmsApi = new WmsApi
+                                            // 提取 id 和 name
+                                            if (row.TryGetProperty("id", out JsonElement idElement) &&
+                                                row.TryGetProperty("name", out JsonElement nameElement))
                                             {
-                                                Id = id,
-                                                Name = name,
-                                                Stock = 0,  // 假設默認為 0，根據實際情況設置
-                                                Qty = 0     // 假設默認為 0，根據實際情況設置
-                                            };
+                                                string id = idElement.GetString();
+                                                string name = nameElement.GetString();
+                                                //int stock = 
+                                                // 創建 WmsApi 物件並設置屬性
+                                                var wmsApi = new WmsApi
+                                                {
+                                                    Id = id,
+                                                    Name = name,
+                                                    Stock = 0,  // 假設默認為 0，根據實際情況設置
+                                                    Qty = 0     // 假設默認為 0，根據實際情況設置
+                                                };
 
-                                            // 將 WmsApi 物件添加到結果列表中
-                                            resultList.Add(wmsApi);
-                                            pageDataResponse.Data = resultList;
+                                                // 將 WmsApi 物件添加到結果列表中
+                                                resultList.Add(wmsApi);
+                                            }
                                         }
-                                        //判斷查詢庫存時有沒有撈到sku跟庫存數
-                                        if (row.TryGetProperty("sku", out JsonElement skuElement) &&
-                                            row.TryGetProperty("stock", out JsonElement stockElement)) { 
-                                            string sku = skuElement.GetString();
-                                            int stock = stockElement.GetInt32();
-                                            allData.Where(x=>x.Id == sku).First().Stock = stock;
-                                            pageDataResponse.Data = allData;
+                                        if (apiName == "查詢庫存")
+                                        {
+                                            //判斷查詢庫存時有沒有撈到sku跟庫存數
+                                            if (row.TryGetProperty("sku", out JsonElement skuElement) &&
+                                                row.TryGetProperty("stock", out JsonElement stockElement) &&
+                                                row.TryGetProperty("name", out JsonElement nameElement))
+                                            {
+                                                string sku = skuElement.GetString();
+                                                int stock = stockElement.GetInt32();
+                                                string name = nameElement.ToString();
+                                                var wmsApi = new WmsApi
+                                                {
+                                                    Id = sku,
+                                                    Name = name,
+                                                    Stock = stock,  // 假設默認為 0，根據實際情況設置
+                                                    Qty = 0     // 假設默認為 0，根據實際情況設置
+                                                };
+
+                                                // 將 WmsApi 物件添加到結果列表中
+                                                resultList.Add(wmsApi);
+                                                
+                                            }
                                         }
                                     }
-                                    
+                                    pageDataResponse.Data = resultList;
                                 }
 
                                 if (dataElement.TryGetProperty("maxpage", out JsonElement maxPageElement))
                                 {
                                     pageDataResponse.MaxPage = maxPageElement.GetInt32();
                                 }
-                                
+
                             }
-                            
+
                             return pageDataResponse;
                         }
                     }
@@ -168,7 +213,7 @@ namespace QDM_PartNoSearch.Controllers
             public List<WmsApi> Data { get; set; }
             public int MaxPage { get; set; }
         }
-
+        //將撈到的商品list，依照50筆拆分出字串
         public static List<string> GroupIds(List<WmsApi> allData, int groupSize = 50)
         {
             // 提取所有 Id
@@ -193,7 +238,7 @@ namespace QDM_PartNoSearch.Controllers
         {
             var allData = await GetAllDataAsync("條件式篩選商品");
             allData = await GetStockDataAsync(allData);
-            return View();
+            return View(allData);
         }
 
     }
