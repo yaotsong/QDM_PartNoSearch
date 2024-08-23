@@ -5,6 +5,8 @@ using Microsoft.Extensions.Caching.Memory;
 using Azure.Core;
 using System.Net.Http;
 using QDM_PartNoSearch.Models;
+using System.Text.Json.Serialization;
+using System.Globalization;
 
 namespace QDM_PartNoSearch.Controllers
 {
@@ -20,12 +22,13 @@ namespace QDM_PartNoSearch.Controllers
             _cache = cache;
             _logger = logger;
         }
-        public async Task<List<string>> GetAllDataAsync()
+        public List<WmsApi> allData = new List<WmsApi>();
+        //api抓頁面筆數用，ex:查詢商場商品資料、訂單查詢
+        public async Task<List<WmsApi>> GetAllDataAsync(string apiName)
         {
-            var allData = new List<string>();
             int currentPage = 1;
             int maxPage;
-            string apiName = "條件式篩選商品";
+
             do
             {
                 var pageData = await GetPageDataAsync(apiName, currentPage);
@@ -44,21 +47,39 @@ namespace QDM_PartNoSearch.Controllers
 
             return allData;
         }
-        // 全域變數來存儲提取的資料
-         public List<string> ResultList { get; private set; } = new List<string>();
-        private async Task<PageDataResponse> GetPageDataAsync(string apiurl, int pageNumber)
+        //api抓庫存用，ex:查詢商品庫存
+        public async Task<List<WmsApi>> GetStockDataAsync(List<WmsApi> data)
+        {
+            if (data.Any())
+            {
+                var AllSkuData = GroupIds(data);
+                foreach (var item in AllSkuData)
+                {
+                    GetPageDataAsync("查詢庫存", 1, item);
+                }
+                
+            }
+            
+
+            return allData;
+        }
+
+        private async Task<PageDataResponse> GetPageDataAsync(string apiName, int pageNumber, string skuString="")
         {
             var url = "";
-            var resultList = new List<string>();
+            var resultList = new List<WmsApi>();
             if (_cache.TryGetValue("AccessToken", out string _accessToken))
             {
                 try
                 {
                     _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
-                    switch (apiurl)
+                    switch (apiName)
                     {
                         case "條件式篩選商品":
                             url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/product/pro_query.php?nowpage={pageNumber}&pagesize=100";
+                            break;
+                        case "查詢庫存":
+                            url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/inventory/stock_query.php?sku={skuString}";
                             break;
                         default:
                             url = "";
@@ -80,24 +101,44 @@ namespace QDM_PartNoSearch.Controllers
                                     // 遍歷 rows 陣列
                                     foreach (var row in rowsElement.EnumerateArray())
                                     {
+                                        
                                         // 提取 id 和 name
                                         if (row.TryGetProperty("id", out JsonElement idElement) &&
                                             row.TryGetProperty("name", out JsonElement nameElement))
                                         {
                                             string id = idElement.GetString();
                                             string name = nameElement.GetString();
+                                            //int stock = 
+                                            // 創建 WmsApi 物件並設置屬性
+                                            var wmsApi = new WmsApi
+                                            {
+                                                Id = id,
+                                                Name = name,
+                                                Stock = 0,  // 假設默認為 0，根據實際情況設置
+                                                Qty = 0     // 假設默認為 0，根據實際情況設置
+                                            };
 
-                                            // 將 id 和 name 存儲到 List 中
-                                            resultList.Add($"ID: {id}, Name: {name}");
+                                            // 將 WmsApi 物件添加到結果列表中
+                                            resultList.Add(wmsApi);
                                             pageDataResponse.Data = resultList;
                                         }
+                                        //判斷查詢庫存時有沒有撈到sku跟庫存數
+                                        if (row.TryGetProperty("sku", out JsonElement skuElement) &&
+                                            row.TryGetProperty("stock", out JsonElement stockElement)) { 
+                                            string sku = skuElement.GetString();
+                                            int stock = stockElement.GetInt32();
+                                            allData.Where(x=>x.Id == sku).First().Stock = stock;
+                                            pageDataResponse.Data = allData;
+                                        }
                                     }
+                                    
                                 }
 
                                 if (dataElement.TryGetProperty("maxpage", out JsonElement maxPageElement))
                                 {
                                     pageDataResponse.MaxPage = maxPageElement.GetInt32();
                                 }
+                                
                             }
                             
                             return pageDataResponse;
@@ -124,66 +165,34 @@ namespace QDM_PartNoSearch.Controllers
 
         public class PageDataResponse
         {
-            public List<string> Data { get; set; }
+            public List<WmsApi> Data { get; set; }
             public int MaxPage { get; set; }
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetApiInfo(string url)
+        public static List<string> GroupIds(List<WmsApi> allData, int groupSize = 50)
         {
-            if (_cache.TryGetValue("AccessToken", out string? accessToken))
-            {
-                try
-                {
-                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            // 提取所有 Id
+            List<string> ids = allData.Select(x => x.Id).ToList();
 
-                    HttpResponseMessage response = await _httpClient.GetAsync(url);
+            // 将 Id 按每 groupSize 个分组
+            var groupedIds = ids
+                .Select((id, index) => new { id, index })
+                .GroupBy(x => x.index / groupSize)
+                .Select(g => g.Select(x => x.id).ToList())
+                .ToList();
 
-                    if (response.IsSuccessStatusCode)
-                    {
-                        string content = await response.Content.ReadAsStringAsync();
-                        using (JsonDocument doc = JsonDocument.Parse(content))
-                        {
-                            JsonElement root = doc.RootElement;
-                            // 檢查是否包含 "data" 屬性
-                            if (root.TryGetProperty("data", out JsonElement dataElement) &&
-                                dataElement.TryGetProperty("maxpage", out JsonElement maxPageElement))
-                            {
-                                // 先獲取 maxpage 的值，再去call對應的apiAction
-                                int maxPage = maxPageElement.GetInt32();
+            // 将每组 Id 转换为字符串
+            List<string> groupedStrings = groupedIds
+                .Select(group => string.Join(",", group))
+                .ToList();
 
-                                return Ok($"Max Page: {maxPage}");
-                            }
-                            else
-                            {
-                                // 如果 "data" 或 "maxpage" 屬性不存在，返回相應錯誤信息
-                                return BadRequest("無法在響應中找到 'data' 或 'maxpage'");
-                            }
-
-                        }
-                    }
-                    else
-                    {
-                        // 返回失敗信息
-                        return NotFound($"API 呼叫失敗: {response.ReasonPhrase}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // 返回錯誤信息
-                    return NotFound($"發生錯誤: {ex.Message}");
-                }
-            }
-            else
-            {
-                _logger.LogWarning("Access token not found in cache.");
-                return StatusCode(500, "Access token not found in cache.");
-            }
+            return groupedStrings;
         }
 
-        public IActionResult StoreNum()
+        public async Task<IActionResult> StoreNum()
         {
-            Task<List<string>> task = GetAllDataAsync();
+            var allData = await GetAllDataAsync("條件式篩選商品");
+            allData = await GetStockDataAsync(allData);
             return View();
         }
 
