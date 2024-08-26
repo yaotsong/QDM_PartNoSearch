@@ -90,7 +90,7 @@ namespace QDM_PartNoSearch.Controllers
         {
             DateTime today = DateTime.Today;
             DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
-
+            //DateTime firstDayOfMonth = today.AddDays(-7);
             var dataDict = data.ToDictionary(item => item.Id);
             var orderAllData = new Dictionary<string, int>();
 
@@ -203,8 +203,9 @@ namespace QDM_PartNoSearch.Controllers
                                     var sku = row.GetProperty("sku").GetString();
                                     var stock = row.GetProperty("stock").GetInt32();
                                     var name = row.GetProperty("name").GetString();
+                                    var occupied_stock = row.GetProperty("occupied_stock").GetInt32();
                                     pageDataResponse.Products ??= new List<WmsProduct>();
-                                    pageDataResponse.Products.Add(new WmsProduct { Id = sku, Name = name, Stock = stock });
+                                    pageDataResponse.Products.Add(new WmsProduct { Id = sku, Name = name, Stock = stock-occupied_stock });
                                 }
                                 else if (apiName == "條件式篩選訂單")
                                 {
