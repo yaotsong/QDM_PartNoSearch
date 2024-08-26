@@ -8,6 +8,7 @@ using QDM_PartNoSearch.Models;
 using System.Text.Json.Serialization;
 using System.Globalization;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace QDM_PartNoSearch.Controllers
 {
@@ -23,13 +24,15 @@ namespace QDM_PartNoSearch.Controllers
             _cache = cache;
             _logger = logger;
         }
-        public List<WmsProduct> allData = new List<WmsProduct>();
-        //api抓頁面筆數用，ex:查詢商場商品資料、訂單查詢
-        public async Task<List<WmsProduct>> GetAllDataAsync(string apiName)
+
+        //api抓商店筆數用
+        public async Task<List<WmsProduct>> GetProductDataAsync(string apiName)
         {
+            List<WmsProduct> productData = new List<WmsProduct>(); //儲存商品資料用
             int currentPage = 1;
             int maxPage;
 
+            //讀取api每一分頁資料後存到list裏頭
             do
             {
                 var pageData = await GetPageDataAsync(apiName, currentPage);
@@ -38,17 +41,19 @@ namespace QDM_PartNoSearch.Controllers
                     _logger.LogError("Failed to retrieve data for page {PageNumber}", currentPage);
                     break;
                 }
-
-                allData.AddRange(pageData.Data); // Assume `Data` is a list of `YourDataType` in your API response
+                if(pageData.Products.Any()) {
+                    productData.AddRange(pageData.Products); // Assume `Data` is a list of `YourDataType` in your API response
+                }
+               
 
                 maxPage = pageData.MaxPage; // Get the max page number from the response
                 currentPage++;
             }
             while (currentPage <= maxPage);
 
-            return allData;
+            return productData;
         }
-        //api抓庫存用，ex:查詢商品庫存
+        //api抓商品庫存用，並將庫存數字合併商品list
         public async Task<List<WmsProduct>> GetStockDataAsync(List<WmsProduct> data)
         {
             var responsesList = new List<WmsProduct>();
@@ -70,9 +75,9 @@ namespace QDM_PartNoSearch.Controllers
                 // 合併所有查詢結果
                 foreach (var response in responses)
                 {
-                    if (response?.Data != null)
+                    if (response?.Products != null)
                     {
-                        responsesList.AddRange(response.Data);
+                        responsesList.AddRange(response.Products);
                     }
                 }
             }
@@ -92,11 +97,94 @@ namespace QDM_PartNoSearch.Controllers
             return data;
         }
 
-
-        private async Task<PageDataResponse> GetPageDataAsync(string apiName, int pageNumber, string skuString = "")
+        //api抓訂單資料用，並將訂單商品明細合併到商品list
+        public async Task<List<WmsProduct>> GetOrderDataAsync(List<WmsProduct> data)
         {
+            // 獲取當前日期
+            DateTime today = DateTime.Today;
+
+            // 獲取當前月份的第一天
+            DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
+
+            // 儲存商品資料的 Dictionary，以便快速查找
+            var dataDict = data.ToDictionary(item => item.Id, item => item);
+
+            // 當月訂單明細資料
+            var orderAllData = new Dictionary<string, int>();
+
+            // 循環從當月第一天到今天
+            do
+            {
+                int currentPage = 1;
+                int maxPage;
+                var orderList = new List<WmsOrder>();
+
+                do // 讀取 API 每一分頁資料後存到 list 裡頭
+                {
+                    var pageData = await GetPageDataAsync("條件式篩選訂單", currentPage, "", firstDayOfMonth);
+                    if (pageData == null)
+                    {
+                        _logger.LogError("Failed to retrieve data for page {PageNumber}", currentPage);
+                        break;
+                    }
+                    if (pageData.Orders.Any())
+                    {
+                        orderList.AddRange(pageData.Orders);
+                    }
+
+                    maxPage = pageData.MaxPage; // Get the max page number from the response
+                    currentPage++;
+                }
+                while (currentPage <= maxPage);
+
+                // 彙整訂單資料
+                foreach (var order in orderList)
+                {
+                    if (orderAllData.ContainsKey(order.sku))
+                    {
+                        orderAllData[order.sku] += order.qty;
+                    }
+                    else
+                    {
+                        orderAllData[order.sku] = order.qty;
+                    }
+                }
+
+                firstDayOfMonth = firstDayOfMonth.AddDays(1);
+            }
+            while (firstDayOfMonth <= today);
+
+            // 更新商品 data 資料
+            foreach (var kvp in orderAllData)
+            {
+                var sku = kvp.Key;
+                var qty = kvp.Value;
+
+                if (dataDict.TryGetValue(sku, out var existingItem))
+                {
+                    // 如果已存在，則累加 Qty
+                    existingItem.Qty += qty;
+                }
+                else
+                {
+                    // 如果不存在，則新增條目
+                    dataDict[sku] = new WmsProduct { Id = sku, Qty = qty };
+                }
+            }
+
+            // 將 Dictionary 轉回 List
+            return dataDict.Values.ToList();
+        }
+
+
+        private async Task<PageDataResponse> GetPageDataAsync(string apiName, int pageNumber, string skuString = "", DateTime? date=null)
+        {
+            // 如果 date 是 null，则设置为今天的日期
+            DateTime effectiveDate = date ?? DateTime.Today;
+            var dateString = effectiveDate.ToString("yyyy/MM/dd");
             var url = "";
-            var resultList = new List<WmsProduct>();
+            var productList = new List<WmsProduct>();
+            var orderList = new List<WmsOrder>();
             if (_cache.TryGetValue("AccessToken", out string _accessToken))
             {
                 try
@@ -109,6 +197,9 @@ namespace QDM_PartNoSearch.Controllers
                             break;
                         case "查詢庫存":
                             url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/inventory/stock_query.php?sku={skuString}";
+                            break;
+                        case "條件式篩選訂單":
+                            url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}";
                             break;
                         default:
                             url = "";
@@ -149,8 +240,9 @@ namespace QDM_PartNoSearch.Controllers
                                                 };
 
                                                 // 將 WmsApi 物件添加到結果列表中
-                                                resultList.Add(wmsApi);
+                                                productList.Add(wmsApi);
                                             }
+                                            pageDataResponse.Products = productList;
                                         }
                                         if (apiName == "查詢庫存")
                                         {
@@ -171,12 +263,57 @@ namespace QDM_PartNoSearch.Controllers
                                                 };
 
                                                 // 將 WmsApi 物件添加到結果列表中
-                                                resultList.Add(wmsApi);
-                                                
+                                                productList.Add(wmsApi);
+                                                       
                                             }
+                                            pageDataResponse.Products = productList;
+                                        }
+                                        if (apiName == "條件式篩選訂單")
+                                        {
+                                            //判斷訂單狀態
+                                            string status_code;string status_name;string sku;int qty;
+                                            if (row.TryGetProperty("status_code", out JsonElement statusElement) && row.TryGetProperty("status_name", out JsonElement statusNameElement))
+                                            {
+                                                status_code = statusElement.GetString();
+                                                status_name = statusNameElement.ToString();
+                                                if (status_code == "P" || status_code == "F")
+                                                {
+                                                    //撈取訂單明細
+                                                    if (row.TryGetProperty("products", out JsonElement pdElement))
+                                                    {
+                                                        foreach (var pd in pdElement.EnumerateArray())
+                                                        {
+                                                            if (pd.TryGetProperty("items", out JsonElement pdItemsElement))
+                                                            {
+                                                                foreach (var pdItem in pdItemsElement.EnumerateArray())
+                                                                {
+                                                                    //判斷查詢庫存時有沒有撈到sku跟訂單數
+                                                                    if (pdItem.TryGetProperty("sku", out JsonElement skuElement) &&
+                                                                        pdItem.TryGetProperty("qty", out JsonElement qtyElement))
+                                                                    {
+                                                                        sku = skuElement.GetString();
+                                                                        qty = qtyElement.GetInt32();
+                                                                        var wmsApi = new WmsOrder
+                                                                        {
+                                                                            status_code = status_code,
+                                                                            status_name = status_name,
+                                                                            sku = sku,  // 假設默認為 0，根據實際情況設置
+                                                                            qty = qty     // 假設默認為 0，根據實際情況設置
+                                                                        };
+
+                                                                        // 將 WmsApi 物件添加到結果列表中
+                                                                        orderList.Add(wmsApi);
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        
+                                                    }
+                                                }
+                                            }
+                                            pageDataResponse.Orders = orderList;
                                         }
                                     }
-                                    pageDataResponse.Data = resultList;
                                 }
 
                                 if (dataElement.TryGetProperty("maxpage", out JsonElement maxPageElement))
@@ -210,7 +347,8 @@ namespace QDM_PartNoSearch.Controllers
 
         public class PageDataResponse
         {
-            public List<WmsProduct> Data { get; set; }
+            public List<WmsProduct> Products { get; set; }
+            public List<WmsOrder> Orders { get; set; }
             public int MaxPage { get; set; }
         }
         //將撈到的商品list，依照50筆拆分出字串
@@ -236,9 +374,10 @@ namespace QDM_PartNoSearch.Controllers
 
         public async Task<IActionResult> StoreNum()
         {
-            var allData = await GetAllDataAsync("條件式篩選商品");
-            allData = await GetStockDataAsync(allData);
-            return View(allData);
+            var pdData = await GetProductDataAsync("條件式篩選商品");
+            pdData = await GetStockDataAsync(pdData);
+            var test = await GetOrderDataAsync(pdData);
+            return View(pdData);
         }
 
     }
