@@ -1,15 +1,32 @@
 ﻿@{
     ViewData["Title"] = "庫存查詢";
 }
-@{
-    var accessToken = ViewBag.AccessToken as string;
-}
-
-@if (!string.IsNullOrEmpty(accessToken) && !accessToken.StartsWith("無法") && !accessToken.StartsWith("發生錯誤"))
-{
-    <p>Access Token: @accessToken</p>
-}
-else
-{
-    <p>@accessToken</p>
-}
+@model List<WmsProduct>
+<div class="container mt-4">
+    <h1 class="mb-4">商品庫存和訂單明細</h1>
+    <div class="table-container">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>商品編號</th>
+                    <th>商品名稱</th>
+                    <th>庫存</th>
+                    <th>訂單需求數量</th>
+                    <th>實際庫存數量</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var product in Model)
+                {
+                    <tr>
+                        <td>@product.Id</td>
+                        <td>@product.Name</td>
+                        <td>@product.Stock</td>
+                        <td>@product.Qty</td>
+                        <td>@(product.Stock - product.Qty)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
