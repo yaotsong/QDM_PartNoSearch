@@ -23,7 +23,7 @@ namespace QDM_PartNoSearch.Controllers
             return View();
         }
 
-        public IActionResult Privacy()
+        public IActionResult HomePage()
         {
             return View();
         }
