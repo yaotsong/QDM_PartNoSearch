@@ -271,10 +271,26 @@ namespace QDM_PartNoSearch.Controllers
 
         public async Task<IActionResult> StoreNum()
         {
-            var pdData = await GetProductDataAsync();
-            pdData = await GetStockDataAsync(pdData);
-            pdData = await GetOrderDataAsync(pdData);
-            return View(pdData);
+            try
+            {
+                // 獲取商品資料
+                var pdData = await GetProductDataAsync();
+
+                // 獲取庫存資料並更新 pdData
+                pdData = await GetStockDataAsync(pdData);
+
+                // 獲取訂單資料並更新 pdData
+                pdData = await GetOrderDataAsync(pdData);
+
+                // 返回視圖，並將 pdData 作為模型傳遞給視圖
+                return View(pdData);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("錯誤: {Message}", ex.Message);
+                // 返回錯誤視圖或處理錯誤的方式
+                return View("Error");
+            }
         }
     }
 }
