@@ -31,7 +31,7 @@ html, body {
 .wrapper {
     display: flex;
     align-items: stretch;
-    min-height: 100vh;
+    min-height: 93vh;
 }
 
 #content {
@@ -92,4 +92,9 @@ html, body {
 
 #sidebar.active #sidebarCollapse {
     right: -30px; /* 調整收起時按鈕的位置 */
+}
+
+.table-container {
+    max-height: calc(93vh - 200px); /* 120px 是假設的 header 和 footer 高度 */
+    overflow-y: auto;
 }
