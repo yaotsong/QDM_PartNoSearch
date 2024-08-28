@@ -162,7 +162,7 @@ namespace QDM_PartNoSearch.Controllers
                 _ => throw new ArgumentException("無效的 API 名稱", nameof(apiName))
             };
 
-            if (!_cache.TryGetValue("AccessToken", out string accessToken))
+            if (!_cache.TryGetValue("ReyiAccessToken", out string accessToken))
             {
                 _logger.LogWarning("快取中找不到存取令牌。");
                 return null;

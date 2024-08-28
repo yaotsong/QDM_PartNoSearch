@@ -15,16 +15,20 @@ namespace QDM_PartNoSearch.Services
         private readonly ILogger<TokenRefreshService> _logger;
         private readonly IMemoryCache _cache;
         private Timer _timer;
-        private readonly string _apiId;
-        private readonly string _apiKey;
+        private readonly string _reyiApiId;
+        private readonly string _reyiApiKey;
+        private readonly string _flavorApiId;
+        private readonly string _flavorApiKey;
 
         public TokenRefreshService(IHttpClientFactory httpClientFactory, ILogger<TokenRefreshService> logger, IMemoryCache cache, IConfiguration configuration)
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
             _cache = cache;
-            _apiId = configuration["ApiSettings:ApiId"];
-            _apiKey = configuration["ApiSettings:ApiKey"];
+            _reyiApiId = configuration["ApiSettings:ReyiApiId"];
+            _reyiApiKey = configuration["ApiSettings:ReyiApiKey"];
+            _flavorApiId = configuration["ApiSettings:FlavorApiId"];
+            _flavorApiKey = configuration["ApiSettings:FlavorApuKey"];
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -39,16 +43,20 @@ namespace QDM_PartNoSearch.Services
             try
             {
                 var httpClient = _httpClientFactory.CreateClient();
-                string apiUrl = "https://reyi-distribution.wms.changliu.com.tw/api_v1/token/authorize.php";
-                string apiId = _apiId;
-                string apiKey = _apiKey;
+                //日翊暢流API
+                string reyiApiUrl = "https://reyi-distribution.wms.changliu.com.tw/api_v1/token/authorize.php";
+                string reyiApiId = _reyiApiId;
+                string reyiApiKey = _reyiApiKey;
+                
 
                 // Create authorization header
-                string authString = $"{apiId}:{apiKey}";
-                string base64AuthString = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(authString));
-                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", base64AuthString);
+                //日翊暢流
+                string reyiAuthString = $"{reyiApiId}:{reyiApiKey}";
+                string reyiBase64AuthString = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(reyiAuthString));
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", reyiBase64AuthString);
+               
 
-                HttpResponseMessage response = await httpClient.GetAsync(apiUrl);
+                HttpResponseMessage response = await httpClient.GetAsync(reyiApiUrl);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -59,18 +67,53 @@ namespace QDM_PartNoSearch.Services
                             dataElement.TryGetProperty("access_token", out JsonElement accessTokenElement))
                         {
                             string accessToken = accessTokenElement.GetString();
-                            _cache.Set("AccessToken", accessToken, TimeSpan.FromHours(1)); // Store in cache with 1 hour expiration
-                            _logger.LogInformation($"Access token refreshed and cached: {accessToken}");
+                            _cache.Set("ReyiAccessToken", accessToken, TimeSpan.FromHours(1)); // Store in cache with 1 hour expiration
+                            _logger.LogInformation($"Reyi Access token refreshed and cached: {accessToken}");
                         }
                         else
                         {
-                            _logger.LogError("Unable to find access_token in response.");
+                            _logger.LogError("Unable to findReyi  access_token in response.");
                         }
                     }
                 }
                 else
                 {
-                    _logger.LogError($"API call failed: {response.ReasonPhrase}");
+                    _logger.LogError($"Reyi API call failed: {response.ReasonPhrase}");
+                }
+
+
+                //暢流API
+                string flavorApiUrl = "https://192.168.1.100/api_v1/token/authorize.php";
+                string flavorApiId = _reyiApiId;
+                string flavorApiKey = _reyiApiKey;
+                //暢流
+                string flavorAuthString = $"{flavorApiId}:{flavorApiKey}";
+                string flavorBase64AuthString = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(flavorAuthString));
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", flavorBase64AuthString);
+
+                HttpResponseMessage flavor_response = await httpClient.GetAsync(flavorApiUrl);
+
+                if (flavor_response.IsSuccessStatusCode)
+                {
+                    string content = await flavor_response.Content.ReadAsStringAsync();
+                    using (JsonDocument doc = JsonDocument.Parse(content))
+                    {
+                        if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement) &&
+                            dataElement.TryGetProperty("access_token", out JsonElement accessTokenElement))
+                        {
+                            string accessToken = accessTokenElement.GetString();
+                            _cache.Set("FlavorAccessToken", accessToken, TimeSpan.FromHours(1)); // Store in cache with 1 hour expiration
+                            _logger.LogInformation($"Flavor Access token refreshed and cached: {accessToken}");
+                        }
+                        else
+                        {
+                            _logger.LogError("Unable to find Flavor access_token in response.");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.LogError($"Flavor API call failed: {response.ReasonPhrase}");
                 }
             }
             catch (Exception ex)
