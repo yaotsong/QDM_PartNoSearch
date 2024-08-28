@@ -31,7 +31,7 @@ html, body {
 .wrapper {
     display: flex;
     align-items: stretch;
-    min-height: 93vh;
+    min-height: 93.5vh;
 }
 
 #content {
