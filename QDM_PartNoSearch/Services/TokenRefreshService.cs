@@ -28,12 +28,12 @@ namespace QDM_PartNoSearch.Services
             _reyiApiId = configuration["ApiSettings:ReyiApiId"];
             _reyiApiKey = configuration["ApiSettings:ReyiApiKey"];
             _flavorApiId = configuration["ApiSettings:FlavorApiId"];
-            _flavorApiKey = configuration["ApiSettings:FlavorApuKey"];
+            _flavorApiKey = configuration["ApiSettings:FlavorApiKey"];
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("TokenRefreshService is starting.");
+            _logger.LogInformation("TokenRefreshService 正在啟動。");
             _timer = new Timer(RefreshToken, null, TimeSpan.Zero, TimeSpan.FromHours(1));
             return Task.CompletedTask;
         }
@@ -42,21 +42,45 @@ namespace QDM_PartNoSearch.Services
         {
             try
             {
-                var httpClient = _httpClientFactory.CreateClient();
-                //日翊暢流API
-                string reyiApiUrl = "https://reyi-distribution.wms.changliu.com.tw/api_v1/token/authorize.php";
-                string reyiApiId = _reyiApiId;
-                string reyiApiKey = _reyiApiKey;
-                
+                var httpClient = _httpClientFactory.CreateClient("NoCertValidationClient");
 
-                // Create authorization header
-                //日翊暢流
-                string reyiAuthString = $"{reyiApiId}:{reyiApiKey}";
-                string reyiBase64AuthString = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(reyiAuthString));
-                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", reyiBase64AuthString);
-               
+                // 刷新暢流 API 的存取令牌
+                await RefreshTokenForApi(
+                    httpClient,
+                    "https://192.168.1.100/api_v1/token/authorize.php",
+                    _flavorApiId,
+                    _flavorApiKey,
+                    "FlavorAccessToken",
+                    "暢流"
+                );
 
-                HttpResponseMessage response = await httpClient.GetAsync(reyiApiUrl);
+                // 刷新日翊 API 的存取令牌
+                await RefreshTokenForApi(
+                    httpClient,
+                    "https://reyi-distribution.wms.changliu.com.tw/api_v1/token/authorize.php",
+                    _reyiApiId,
+                    _reyiApiKey,
+                    "ReyiAccessToken",
+                    "日翊"
+                );
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"刷新存取令牌時發生錯誤：{ex.Message}");
+            }
+        }
+
+        private async Task RefreshTokenForApi(HttpClient httpClient, string apiUrl, string apiId, string apiKey, string cacheKey, string apiName)
+        {
+            try
+            {
+                // 建立授權標頭
+                string authString = $"{apiId}:{apiKey}";
+                string base64AuthString = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(authString));
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", base64AuthString);
+
+                HttpResponseMessage response = await httpClient.GetAsync(apiUrl);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -67,64 +91,29 @@ namespace QDM_PartNoSearch.Services
                             dataElement.TryGetProperty("access_token", out JsonElement accessTokenElement))
                         {
                             string accessToken = accessTokenElement.GetString();
-                            _cache.Set("ReyiAccessToken", accessToken, TimeSpan.FromHours(1)); // Store in cache with 1 hour expiration
-                            _logger.LogInformation($"Reyi Access token refreshed and cached: {accessToken}");
+                            _cache.Set(cacheKey, accessToken, TimeSpan.FromHours(1)); // 儲存到快取，設定 1 小時過期
+                            _logger.LogInformation($"{apiName} 存取令牌已刷新並快取：{accessToken}");
                         }
                         else
                         {
-                            _logger.LogError("Unable to findReyi  access_token in response.");
+                            _logger.LogError($"無法在 {apiName} 的回應中找到 access_token。");
                         }
                     }
                 }
                 else
                 {
-                    _logger.LogError($"Reyi API call failed: {response.ReasonPhrase}");
-                }
-
-
-                //暢流API
-                string flavorApiUrl = "https://192.168.1.100/api_v1/token/authorize.php";
-                string flavorApiId = _reyiApiId;
-                string flavorApiKey = _reyiApiKey;
-                //暢流
-                string flavorAuthString = $"{flavorApiId}:{flavorApiKey}";
-                string flavorBase64AuthString = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(flavorAuthString));
-                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", flavorBase64AuthString);
-
-                HttpResponseMessage flavor_response = await httpClient.GetAsync(flavorApiUrl);
-
-                if (flavor_response.IsSuccessStatusCode)
-                {
-                    string content = await flavor_response.Content.ReadAsStringAsync();
-                    using (JsonDocument doc = JsonDocument.Parse(content))
-                    {
-                        if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement) &&
-                            dataElement.TryGetProperty("access_token", out JsonElement accessTokenElement))
-                        {
-                            string accessToken = accessTokenElement.GetString();
-                            _cache.Set("FlavorAccessToken", accessToken, TimeSpan.FromHours(1)); // Store in cache with 1 hour expiration
-                            _logger.LogInformation($"Flavor Access token refreshed and cached: {accessToken}");
-                        }
-                        else
-                        {
-                            _logger.LogError("Unable to find Flavor access_token in response.");
-                        }
-                    }
-                }
-                else
-                {
-                    _logger.LogError($"Flavor API call failed: {response.ReasonPhrase}");
+                    _logger.LogError($"{apiName} API 呼叫失敗：{response.ReasonPhrase}");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error occurred while refreshing token: {ex.Message}");
+                _logger.LogError($"{apiName} 存取令牌刷新時發生錯誤：{ex.Message}");
             }
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("TokenRefreshService is stopping.");
+            _logger.LogInformation("TokenRefreshService 正在停止。");
             _timer?.Change(Timeout.Infinite, 0);
             return Task.CompletedTask;
         }
