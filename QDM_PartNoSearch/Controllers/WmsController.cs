@@ -86,11 +86,11 @@ namespace QDM_PartNoSearch.Controllers
         }
 
         // API 抓訂單資料用，並將訂單商品明細合併到商品 list
-        public async Task<List<WmsProduct>> GetOrderDataAsync(List<WmsProduct> data,string market)
+        public async Task<List<WmsProduct>> GetOrderDataAsync(List<WmsProduct> data, string market)
         {
             DateTime today = DateTime.Today;
-            //DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
-            DateTime firstDayOfMonth = today.AddDays(-7); //調整訂單起始天數 從上週開始
+            DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
+            //DateTime firstDayOfMonth = today.AddDays(-7); //調整訂單起始天數 從上週開始
             var dataDict = data.ToDictionary(item => item.Id);
             var orderAllData = new Dictionary<string, int>();
 
@@ -106,11 +106,12 @@ namespace QDM_PartNoSearch.Controllers
                     if (market == "日翊")
                     {
                         pageData = await GetPageDataAsync("日翊條件式篩選訂單", currentPage, "", firstDayOfMonth);
-                    }else if (market == "暢流")
+                    }
+                    else if (market == "暢流")
                     {
                         pageData = await GetPageDataAsync("暢流條件式篩選訂單", currentPage, "", firstDayOfMonth);
                     }
-                    
+
                     if (pageData?.Orders != null)
                     {
                         orderList.AddRange(pageData.Orders);
@@ -166,8 +167,8 @@ namespace QDM_PartNoSearch.Controllers
             {
                 "條件式篩選商品" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/product/pro_query.php?nowpage={pageNumber}&pagesize=100",
                 "查詢庫存" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/inventory/stock_query.php?sku={skuString}",
-                "日翊條件式篩選訂單" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}",
-                "暢流條件式篩選訂單" => $"https://192.168.1.100/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}",
+                "日翊條件式篩選訂單" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,hand",
+                "暢流條件式篩選訂單" => $"https://192.168.1.100/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel",
                 _ => throw new ArgumentException("無效的 API 名稱", nameof(apiName))
             };
 
@@ -226,42 +227,40 @@ namespace QDM_PartNoSearch.Controllers
                                 }
                                 else if (apiName == "日翊條件式篩選訂單" || apiName == "暢流條件式篩選訂單")
                                 {
-                                    var source_key = row.GetProperty("source_key").GetString();
-                                    if (source_key == "qdm" || source_key == "qdm_excel" || source_key == "芝初官網" || source_key =="hand")
+                                    var source_key = row.GetProperty("source_key").GetString(); //來源的EC平台
+                                    var statusCode = row.GetProperty("status_code").GetString(); //訂單狀態碼:F待處理/W轉單中/P轉揀貨
+                                    var statusName = row.GetProperty("status_name").GetString();
+
+                                    var productsElement = row.GetProperty("products");
+                                    if (productsElement.ValueKind == JsonValueKind.Array)
                                     {
-                                        var statusCode = row.GetProperty("status_code").GetString(); //暢流沒有這個欄位
-                                        var statusName = row.GetProperty("status_name").GetString();
-                                        if (statusCode == "P" || statusCode == "F" || statusCode=="W")//F待處理 P轉揀貨 W轉單中
+                                        foreach (var product in productsElement.EnumerateArray())
                                         {
-                                            var productsElement = row.GetProperty("products");
-                                            if (productsElement.ValueKind == JsonValueKind.Array)
+                                            if (source_key == "hand")//人工開單不用到items層
                                             {
-                                                foreach (var product in productsElement.EnumerateArray())
+                                                var sku = product.GetProperty("sku").GetString();
+                                                var qty = product.GetProperty("qty").GetInt32();
+                                                pageDataResponse.Orders ??= new List<WmsOrder>();
+                                                pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, qty = qty });
+                                            }
+                                            else
+                                            {
+                                                var itemsElement = product.GetProperty("items");
+                                                if (itemsElement.ValueKind == JsonValueKind.Array)
                                                 {
-                                                    if(source_key == "hand")//人工開單不用到items層
+                                                    foreach (var item in itemsElement.EnumerateArray())
                                                     {
-                                                        var sku = product.GetProperty("sku").GetString();
-                                                        var qty = product.GetProperty("qty").GetInt32();
+                                                        var sku = item.GetProperty("sku").GetString();
+                                                        var qty = item.GetProperty("qty").GetInt32();
                                                         pageDataResponse.Orders ??= new List<WmsOrder>();
                                                         pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, qty = qty });
-                                                    }
-                                                    else { 
-                                                        var itemsElement = product.GetProperty("items");
-                                                        if (itemsElement.ValueKind == JsonValueKind.Array)
-                                                        {
-                                                            foreach (var item in itemsElement.EnumerateArray())
-                                                            {
-                                                                var sku = item.GetProperty("sku").GetString();
-                                                                var qty = item.GetProperty("qty").GetInt32();
-                                                                pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                                pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, qty = qty });
-                                                            }
-                                                        }
                                                     }
                                                 }
                                             }
                                         }
                                     }
+
+
                                 }
                             }
                         }
@@ -309,9 +308,9 @@ namespace QDM_PartNoSearch.Controllers
                 // 獲取庫存資料並更新 pdData
                 pdData = await GetStockDataAsync(pdData);
                 // 獲取訂單資料並更新 pdData
-                pdData = await GetOrderDataAsync(pdData,"日翊");
+                pdData = await GetOrderDataAsync(pdData, "日翊");
                 // 獲取訂單資料並更新 pdData
-                //pdData = await GetOrderDataAsync(pdData, "暢流");
+                pdData = await GetOrderDataAsync(pdData, "暢流");
 
                 // 返回視圖，並將 pdData 作為模型傳遞給視圖
                 return View(pdData);
