@@ -89,8 +89,8 @@ namespace QDM_PartNoSearch.Controllers
         public async Task<List<WmsProduct>> GetOrderDataAsync(List<WmsProduct> data, string market)
         {
             DateTime today = DateTime.Today;
-            DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
-            //DateTime firstDayOfMonth = today.AddDays(-7); //調整訂單起始天數 從上週開始
+            //DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
+            DateTime firstDayOfMonth = today.AddDays(-30); //調整訂單起始天數 從前30天開始
             var dataDict = data.ToDictionary(item => item.Id);
             var orderAllData = new Dictionary<string, int>();
 
