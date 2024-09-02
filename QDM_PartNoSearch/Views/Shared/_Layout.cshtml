@@ -71,8 +71,22 @@
                 spinner.show(); // 顯示載入圈圈
                 overlay.show(); // 顯示遮罩層
             });
+
+            window.addEventListener('beforeunload', function () {
+                // 顯示載入動畫
+                $('#loading').show();
+                $('#overlay').show();
+            });
+
+            // 監聽頁面加載完成事件
+            $(window).on('load', function () {
+                // 隱藏載入動畫
+                $('#loading').hide();
+                $('#overlay').hide();
+            });
                
         });
+
     </script>
 </body>
 </html>
