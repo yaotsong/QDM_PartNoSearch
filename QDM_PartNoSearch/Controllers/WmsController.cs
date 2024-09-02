@@ -150,10 +150,11 @@ namespace QDM_PartNoSearch.Controllers
                 {
                     existingItem.Qty += kvp.Value;
                 }
-                else
-                {
-                    dataDict[kvp.Key] = new WmsProduct { Id = kvp.Key, Qty = kvp.Value };
-                }
+                //else
+                //{
+                //    dataDict[kvp.Key] = new WmsProduct { Id = kvp.Key, Qty = kvp.Value };
+                //}
+                
             }
 
             return dataDict.Values.ToList();
