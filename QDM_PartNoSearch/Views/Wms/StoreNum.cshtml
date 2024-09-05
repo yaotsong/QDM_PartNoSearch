@@ -18,12 +18,17 @@
             <tbody>
                 @foreach (var product in Model)
                 {
-                    <tr>
+                    // 計算實際庫存數量
+                    var actualStock = product.Stock - product.Qty;
+                    // 根據實際庫存數量設定 CSS 類
+                    var rowStyle = actualStock < 0 ? "color:red" : "";
+
+                    <tr style="@rowStyle">
                         <td>@product.Id</td>
                         <td>@product.Name</td>
                         <td>@product.Stock</td>
                         <td>@product.Qty</td>
-                        <td>@(product.Stock - product.Qty)</td>
+                        <td>@actualStock</td>
                     </tr>
                 }
             </tbody>
