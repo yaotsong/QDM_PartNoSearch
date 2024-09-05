@@ -90,9 +90,9 @@ namespace QDM_PartNoSearch.Controllers
         {
             DateTime today = DateTime.Today;
             //DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
-            DateTime firstDayOfMonth = today.AddDays(-30); //調整訂單起始天數 從前30天開始
+            DateTime firstDayOfMonth = today.AddDays(-180); //調整訂單起始天數 從前30天開始
             var dataDict = data.ToDictionary(item => item.Id);
-            var orderAllData = new Dictionary<string, int>();
+            var orderAllData = new Dictionary<string, Tuple<int, string>>();
 
             do
             {
@@ -132,11 +132,14 @@ namespace QDM_PartNoSearch.Controllers
                 {
                     if (orderAllData.ContainsKey(order.sku))
                     {
-                        orderAllData[order.sku] += order.qty;
+                        var existing = orderAllData[order.sku];
+                        // 更新數量和名稱（名稱保留最新的）
+                        orderAllData[order.sku] = new Tuple<int, string>(existing.Item1 + order.qty, order.name);
                     }
                     else
                     {
-                        orderAllData[order.sku] = order.qty;
+                        // 新增 SKU 和對應的數量及名稱
+                        orderAllData[order.sku] = new Tuple<int, string>(order.qty, order.name);
                     }
                 }
 
@@ -148,12 +151,12 @@ namespace QDM_PartNoSearch.Controllers
             {
                 if (dataDict.TryGetValue(kvp.Key, out var existingItem))
                 {
-                    existingItem.Qty += kvp.Value;
+                    existingItem.Qty += kvp.Value.Item1;
                 }
-                //else
-                //{
-                //    dataDict[kvp.Key] = new WmsProduct { Id = kvp.Key, Qty = kvp.Value };
-                //}
+                else
+                { 
+                    dataDict[kvp.Key] = new WmsProduct { Id = kvp.Key, Qty = kvp.Value.Item1, Name = "(不在日翊庫存)"+kvp.Value.Item2 };
+                }
                 
             }
 
@@ -237,24 +240,37 @@ namespace QDM_PartNoSearch.Controllers
                                     {
                                         foreach (var product in productsElement.EnumerateArray())
                                         {
+                                            var productType = product.GetProperty("type").GetString(); //商品類型 unknown：未知(請先排除異常) warehouse：倉庫端商品 shop：賣場(平台)商品 combine：組合品
                                             if (source_key == "hand")//人工開單不用到items層
                                             {
                                                 var sku = product.GetProperty("sku").GetString();
                                                 var qty = product.GetProperty("qty").GetInt32();
+                                                var name = product.GetProperty("name").GetString();
                                                 pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, qty = qty });
+                                                pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name=name, qty = qty });
                                             }
                                             else
                                             {
                                                 var itemsElement = product.GetProperty("items");
                                                 if (itemsElement.ValueKind == JsonValueKind.Array)
                                                 {
-                                                    foreach (var item in itemsElement.EnumerateArray())
+                                                    if (itemsElement.GetArrayLength() == 0 && (productType == "combine" || productType == "shop"))
                                                     {
-                                                        var sku = item.GetProperty("sku").GetString();
-                                                        var qty = item.GetProperty("qty").GetInt32();
-                                                        pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                        pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, qty = qty });
+                                                        var sku = product.GetProperty("sku").GetString();
+                                                        var qty = product.GetProperty("qty").GetInt32();
+                                                        var name = product.GetProperty("name").GetString();
+                                                        pageDataResponse.Orders = new List<WmsOrder>(); // 如果需要確保 Orders 初始化為空列表
+                                                        pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = "(該料品未展開)"+name, qty = qty });
+                                                    }
+                                                    else { 
+                                                        foreach (var item in itemsElement.EnumerateArray())
+                                                        {
+                                                            var sku = item.GetProperty("sku").GetString();
+                                                            var qty = item.GetProperty("qty").GetInt32();
+                                                            var name = item.GetProperty("name").GetString();
+                                                            pageDataResponse.Orders ??= new List<WmsOrder>();
+                                                            pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
+                                                        }
                                                     }
                                                 }
                                             }
