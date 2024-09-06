@@ -90,7 +90,7 @@ namespace QDM_PartNoSearch.Controllers
         {
             DateTime today = DateTime.Today;
             //DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
-            DateTime firstDayOfMonth = today.AddDays(-180); //調整訂單起始天數 從前30天開始
+            DateTime firstDayOfMonth = today.AddDays(-180); //調整訂單起始天數 從前180天開始
             var dataDict = data.ToDictionary(item => item.Id);
             var orderAllData = new Dictionary<string, Tuple<int, string>>();
 
@@ -154,10 +154,10 @@ namespace QDM_PartNoSearch.Controllers
                     existingItem.Qty += kvp.Value.Item1;
                 }
                 else
-                { 
-                    dataDict[kvp.Key] = new WmsProduct { Id = kvp.Key, Qty = kvp.Value.Item1, Name = "(不在日翊庫存)"+kvp.Value.Item2 };
+                {
+                    dataDict[kvp.Key] = new WmsProduct { Id = kvp.Key, Qty = kvp.Value.Item1, Name = "(不在日翊庫存)" + kvp.Value.Item2 };
                 }
-                
+
             }
 
             return dataDict.Values.ToList();
@@ -172,7 +172,7 @@ namespace QDM_PartNoSearch.Controllers
                 "條件式篩選商品" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/product/pro_query.php?nowpage={pageNumber}&pagesize=100",
                 "查詢庫存" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/inventory/stock_query.php?sku={skuString}",
                 "日翊條件式篩選訂單" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,hand",
-                "暢流條件式篩選訂單" => $"https://192.168.1.100/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel",
+                "暢流條件式篩選訂單" => $"https://192.168.1.100/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,qdm_excel2",
                 _ => throw new ArgumentException("無效的 API 名稱", nameof(apiName))
             };
 
@@ -240,44 +240,42 @@ namespace QDM_PartNoSearch.Controllers
                                     {
                                         foreach (var product in productsElement.EnumerateArray())
                                         {
-                                            var productType = product.GetProperty("type").GetString(); //商品類型 unknown：未知(請先排除異常) warehouse：倉庫端商品 shop：賣場(平台)商品 combine：組合品
-                                            if (source_key == "hand")//人工開單不用到items層
+                                            var productType = product.GetProperty("type").GetString(); // 商品類型
+                                            var sku = product.GetProperty("sku").GetString();
+                                            var qty = product.GetProperty("qty").GetInt32();
+                                            var name = product.GetProperty("name").GetString();
+
+                                            if (source_key == "hand") // 人工開單不用到items層
                                             {
-                                                var sku = product.GetProperty("sku").GetString();
-                                                var qty = product.GetProperty("qty").GetInt32();
-                                                var name = product.GetProperty("name").GetString();
                                                 pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name=name, qty = qty });
+                                                pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
                                             }
                                             else
                                             {
                                                 var itemsElement = product.GetProperty("items");
+
                                                 if (itemsElement.ValueKind == JsonValueKind.Array)
                                                 {
                                                     if (itemsElement.GetArrayLength() == 0 && (productType == "combine" || productType == "shop"))
                                                     {
-                                                        var sku = product.GetProperty("sku").GetString();
-                                                        var qty = product.GetProperty("qty").GetInt32();
-                                                        var name = product.GetProperty("name").GetString();
-                                                        pageDataResponse.Orders = new List<WmsOrder>(); // 如果需要確保 Orders 初始化為空列表
-                                                        pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = "(該料品未展開)"+name, qty = qty });
+                                                        pageDataResponse.Orders ??= new List<WmsOrder>();
+                                                        pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = "(該料品未展開)" + name, qty = qty });
                                                     }
-                                                    else { 
+                                                    else
+                                                    {
                                                         foreach (var item in itemsElement.EnumerateArray())
                                                         {
-                                                            var sku = item.GetProperty("sku").GetString();
-                                                            var qty = item.GetProperty("qty").GetInt32();
-                                                            var name = item.GetProperty("name").GetString();
+                                                            var itemSku = item.GetProperty("sku").GetString();
+                                                            var itemQty = item.GetProperty("qty").GetInt32();
+                                                            var itemName = item.GetProperty("name").GetString();
                                                             pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                            pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
+                                                            pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = itemSku, name = itemName, qty = itemQty });
                                                         }
                                                     }
                                                 }
                                             }
                                         }
                                     }
-
-
                                 }
                             }
                         }
