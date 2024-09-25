@@ -90,7 +90,7 @@ namespace QDM_PartNoSearch.Controllers
         {
             DateTime today = DateTime.Today;
             //DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
-            DateTime firstDayOfMonth = today.AddDays(-180); //調整訂單起始天數 從前180天開始
+            DateTime firstDayOfMonth = today.AddDays(-90); //調整訂單起始天數 從前90天開始
             var dataDict = data.ToDictionary(item => item.Id);
             var orderAllData = new Dictionary<string, Tuple<int, string>>();
 
