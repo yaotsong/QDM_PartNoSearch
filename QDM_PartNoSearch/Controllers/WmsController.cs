@@ -259,6 +259,7 @@ namespace QDM_PartNoSearch.Controllers
 
                                                 if (itemsElement.ValueKind == JsonValueKind.Array)
                                                 {
+                                                    //原先要判斷有沒有展開料號，但發現暢流規則很難定義 放棄顯示未展開提示，只記錄為在日翊暢流的料
                                                     if (itemsElement.GetArrayLength() == 0 && (productType == "combine" || productType == "shop"))
                                                     {
                                                         pageDataResponse.Orders ??= new List<WmsOrder>();
