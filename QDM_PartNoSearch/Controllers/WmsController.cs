@@ -342,7 +342,8 @@ namespace QDM_PartNoSearch.Controllers
                 // 獲取訂單資料並更新 pdData
                 pdData = await GetOrderDataAsync(pdData, "日翊");
                 // 獲取訂單資料並更新 pdData
-                pdData = await GetOrderDataAsync(pdData, "暢流");
+                pdData = await GetOrderDataAsync(pdData, "暢流"); 
+                //將INVMH品號條碼對照表 合併到list裏頭
                 pdData = MatchingPartNo(pdData);
 
                 // 返回視圖，並將 pdData 作為模型傳遞給視圖
