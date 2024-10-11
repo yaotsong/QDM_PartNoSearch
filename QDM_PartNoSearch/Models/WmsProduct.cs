@@ -4,6 +4,7 @@
     {
         //SKU
         public string Id { get; set; }
+        public string PartNo { get; set; }
         //商品名稱
         public string Name { get; set; }
         //庫存數

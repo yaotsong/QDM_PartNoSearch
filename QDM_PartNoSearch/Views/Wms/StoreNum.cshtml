@@ -10,6 +10,7 @@
             <thead>
                 <tr>
                     <th>商品編號</th>
+                    <th>ERP品號</th>
                     <th>商品名稱</th>
                     <th>現有庫存</th>
                     <th>訂單需求數量</th>
@@ -26,6 +27,7 @@
 
                     <tr style="@rowStyle">
                         <td>@product.Id</td>
+                        <td>@product.PartNo</td>
                         <td>@product.Name</td>
                         <td>@product.Stock</td>
                         <td>@product.Qty</td>

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System;
 using QDM_PartNoSearch.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace QDM_PartNoSearch.Controllers
 {
@@ -15,12 +16,14 @@ namespace QDM_PartNoSearch.Controllers
         private readonly HttpClient _httpClient;
         private readonly IMemoryCache _cache;
         private readonly ILogger<WmsController> _logger;
+        private readonly Flavor2Context _context;
 
-        public WmsController(IHttpClientFactory httpClientFactory, IMemoryCache cache, ILogger<WmsController> logger)
+        public WmsController(IHttpClientFactory httpClientFactory, IMemoryCache cache, ILogger<WmsController> logger, Flavor2Context context)
         {
             _httpClient = httpClientFactory.CreateClient("NoCertValidationClient");
             _cache = cache;
             _logger = logger;
+            _context = context;
         }
 
         // API 抓商店筆數用
@@ -259,7 +262,7 @@ namespace QDM_PartNoSearch.Controllers
                                                     if (itemsElement.GetArrayLength() == 0 && (productType == "combine" || productType == "shop"))
                                                     {
                                                         pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                        pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = "(該料品未展開)" + name, qty = qty });
+                                                        pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
                                                     }
                                                     else
                                                     {
@@ -314,6 +317,20 @@ namespace QDM_PartNoSearch.Controllers
                 .ToList();
         }
 
+        public List<WmsProduct> MatchingPartNo (List<WmsProduct> allData)
+        {
+            var Invmhs = _context.Invmhs.ToList();
+            foreach (var item in allData)
+            {
+                var matchingData = Invmhs.FirstOrDefault(x => x.MH001 == item.Id);
+                if(matchingData != null)
+                {
+                    item.PartNo = matchingData.MH002;
+                }
+            }
+            return allData;
+        }
+
         public async Task<IActionResult> StoreNum()
         {
             try
@@ -326,6 +343,7 @@ namespace QDM_PartNoSearch.Controllers
                 pdData = await GetOrderDataAsync(pdData, "日翊");
                 // 獲取訂單資料並更新 pdData
                 pdData = await GetOrderDataAsync(pdData, "暢流");
+                pdData = MatchingPartNo(pdData);
 
                 // 返回視圖，並將 pdData 作為模型傳遞給視圖
                 return View(pdData);

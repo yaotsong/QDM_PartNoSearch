@@ -16,6 +16,7 @@ public partial class Flavor2Context : DbContext
     }
     public virtual DbSet<Invmb> Invmbs { get; set; }
     public virtual DbSet<Invmc> Invmcs { get; set; }
+    public virtual DbSet<Invmh> Invmhs { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("Chinese_Taiwan_Stroke_BIN");
@@ -955,6 +956,24 @@ public partial class Flavor2Context : DbContext
                 .HasDefaultValue("")
                 .HasColumnName("MC002");
         });
+
+        modelBuilder.Entity<Invmh>(entity =>
+        {
+            entity.HasKey(e => e.MH001);
+
+            entity.ToTable("INVMH");
+
+            entity.Property(e => e.MH001)
+                .HasMaxLength(40)
+                .HasDefaultValue("")
+                .IsFixedLength()
+                .HasColumnName("MH001");
+            entity.Property(e => e.MH002)
+                .HasMaxLength(60)
+                .HasDefaultValue("")
+                .HasColumnName("MH002");
+        });
+
 
         OnModelCreatingPartial(modelBuilder);
     }
