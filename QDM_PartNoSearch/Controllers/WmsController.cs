@@ -323,10 +323,10 @@ namespace QDM_PartNoSearch.Controllers
             var Invmhs = _context.Invmhs.ToList();
             foreach (var item in allData)
             {
-                var matchingData = Invmhs.FirstOrDefault(x => x.MH001 == item.Id);
+                var matchingData = Invmhs.FirstOrDefault(x => x.MH002.Trim() == item.Id);
                 if(matchingData != null)
                 {
-                    item.PartNo = matchingData.MH002;
+                    item.PartNo = matchingData.MH001.Trim();
                 }
             }
             return allData;
