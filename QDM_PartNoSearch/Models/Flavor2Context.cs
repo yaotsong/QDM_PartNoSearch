@@ -959,7 +959,8 @@ public partial class Flavor2Context : DbContext
 
         modelBuilder.Entity<Invmh>(entity =>
         {
-            entity.HasKey(e => e.MH001);
+            // 設置複合主鍵
+            entity.HasKey(e => new { e.MH001, e.MH002 });
 
             entity.ToTable("INVMH");
 
