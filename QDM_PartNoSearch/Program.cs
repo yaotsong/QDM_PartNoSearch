@@ -23,7 +23,8 @@ builder.Services.AddHttpClient("NoCertValidationClient")
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddDbContext<Flavor2Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DBContext")));
+builder.Services.AddDbContext<Flavor2Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("Flavor2Context")));
+builder.Services.AddDbContext<DeanContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DeanContext")));
 builder.Services.AddMemoryCache(); // 添加內存緩存服務
 builder.Services.AddHostedService<TokenRefreshService>();
 
