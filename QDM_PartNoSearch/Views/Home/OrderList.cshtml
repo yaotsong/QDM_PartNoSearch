@@ -2,18 +2,30 @@
     ViewData["Title"] = "OrderList";
 }
 
-@model IEnumerable<QDM_PartNoSearch.Models.Invmb>
+@model Dictionary<string, List<QDM_PartNoSearch.Controllers.HomeController.DailyInventory>>
 
 <h1>@ViewData["Title"]</h1>
 
-<table id="memberlist" class="table table-bordered">
+<table id="inventoryReport" class="table table-bordered">
+    <thead>
+        <tr>
+            <th>料號</th>
+            @foreach (var date in Model.Values.SelectMany(v => v).Select(d => d.Date.Date).Distinct().OrderBy(d => d))
+            {
+                <th>@date.ToString("MM/dd")</th>
+            }
+        </tr>
+    </thead>
     <tbody>
-        @foreach (var items in Model)
+        @foreach (var partNo in Model)
         {
             <tr>
-                <td>@items.Mb001</td>
-                <td>@items.Mb002</td>
-
+                <td>@partNo.Key</td>
+                @foreach (var date in Model.Values.SelectMany(v => v).Select(d => d.Date.Date).Distinct().OrderBy(d => d))
+                {
+                    var quantity = partNo.Value.FirstOrDefault(d => d.Date.Date == date)?.Quantity ?? 0;
+                    <td>@quantity</td>
+                }
             </tr>
         }
     </tbody>

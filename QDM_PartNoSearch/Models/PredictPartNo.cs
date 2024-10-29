@@ -4,6 +4,6 @@
     {
         public DateTime DateTime { get; set; }
         public string? PartNo { get; set; }
-        public string? Num { get; set; }
+        public int? Num { get; set; }
     }
 }
