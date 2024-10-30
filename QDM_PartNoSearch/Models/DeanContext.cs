@@ -22,7 +22,7 @@ namespace QDM_PartNoSearch.Models
 
             modelBuilder.Entity<PredictPartNo>(entity =>
             {
-                entity.HasKey(e => new { e.DateTime, e.PartNo });
+                entity.HasKey(e => new { e.DateTime, e.PartNo, e.Num });
 
                 entity.ToTable("PredictPartNo");
 
