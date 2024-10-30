@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using QDM_PartNoSearch.Models;
 using System.Diagnostics;
 
@@ -28,61 +29,67 @@ namespace QDM_PartNoSearch.Controllers
             return View();
         }
 
-        public IActionResult OrderList()
+        public IActionResult PredictPartNo()
+        {
+            //var invMB = _context.Invmbs
+            //     .Where(x => x.Mb064 != 0)
+            //     .Select(x => new
+            //     {
+            //         PartNo = x.Mb001.Trim(),
+            //         Name = x.Mb002.Trim(),
+            //         Num = x.Mb064
+            //     })
+            //     .ToList();
+
+            // 返回視圖並傳遞資料
+            return View(); // 確保你的視圖能夠正確顯示報告
+        }
+
+        public JsonResult GetPredictedPartNos(DateTime startDate, DateTime endDate)
         {
             // 撈取 PredictPartNo 的所有資料
-            var predictPartNos = _deanContext.PredictPartNo.ToList();
-            var invMB = _context.Invmbs.Select(x => new Invmb
-            {
-                Mb001 = x.Mb001.Trim(),
-                Mb002 = x.Mb002.Trim(),
-                Mb064 = x.Mb064
-            }).Where(x=>x.Mb064 != 0).ToList();
+            var predictPartNos = _deanContext.PredictPartNo
+                .Where(p => p.DateTime >= startDate && p.DateTime <= endDate)
+                .ToList();
 
-            var report = GenerateInventoryReport(predictPartNos, invMB);
-            // 返回視圖並傳遞資料
-            return View(report); // 確保你的視圖能夠正確顯示報告
-        }
-
-        private Dictionary<string, List<DailyInventory>> GenerateInventoryReport(
-            List<PredictPartNo> forecasts,
-            List<Invmb> inventories)
-        {
-            var dailyInventory = new Dictionary<string, List<DailyInventory>>();
-
-            // 初始化庫存
-            foreach (var inventory in inventories)
-            {
-                dailyInventory[inventory.Mb001] = new List<DailyInventory>();
-            }
-
-            // 獲取所有預估日期
-            var allDates = forecasts.Select(f => f.DateTime.Date).Distinct().OrderBy(d => d).ToList();
-
-            foreach (var date in allDates)
-            {
-                foreach (var inventory in inventories)
+            var invMB = _context.Invmbs
+                .Where(x => x.Mb064 != 0)
+                .Select(x => new
                 {
-                    int stock = (int)inventory.Mb064.GetValueOrDefault(); // 使用 GetValueOrDefault
+                    Mb001 = x.Mb001.Trim(),
+                    Mb002 = x.Mb002.Trim(),
+                    Mb064 = x.Mb064
+                })
+                .ToList();
 
-                    // 累加預估數量
-                    var forecastQuantity = forecasts
-                        .Where(f => f.PartNo == inventory.Mb001 && f.DateTime.Date == date)
-                        .Sum(f => f.Num.GetValueOrDefault()); // 確保安全使用
+            // 儲存計算後庫存數量
+            var formData = new List<object>();
 
-                    stock += forecastQuantity;
+            foreach (var inv in invMB)
+            {
+                // 檢查 inv.Mb001 是否在 predictPartNos 中
+                var matchingPartNos = predictPartNos
+                    .Where(p => p.PartNo == inv.Mb001 && DateTime.Now <= p.DateTime)
+                    .ToList();
 
-                    dailyInventory[inventory.Mb001].Add(new DailyInventory
-                    {
-                        Date = date,
-                        PartNo = inventory.Mb001,
-                        Quantity = stock
-                    });
-                }
+                // 計算加總
+                var totalNum = matchingPartNos.Any() ? matchingPartNos.Sum(p => p.Num) : 0;
+
+                // 創建新的條目並填充數據
+                var newEntry = new
+                {
+                    PartNo = inv.Mb001,
+                    Name = inv.Mb002,
+                    Num = (int)inv.Mb064 + totalNum
+                };
+
+                formData.Add(newEntry);
             }
-
-            return dailyInventory;
+            var Data = new { data = formData };
+            // 返回 JSON 格式的資料
+            return Json(Data);
         }
+
 
         public class DailyInventory
         {

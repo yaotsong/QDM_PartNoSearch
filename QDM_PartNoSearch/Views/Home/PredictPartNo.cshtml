@@ -1,0 +1,127 @@
+﻿@{
+    ViewData["Title"] = "預估庫存查詢";
+}
+
+<div class="container mt-4">
+    <h3 class="mb-4">預估庫存查詢</h3>
+    <form id="inventoryQueryForm" onsubmit="return validateDates();">
+        <div class="row mb-3 align-items-center">
+            <div class="col-md-6 mb-2 mb-md-0">
+                <div class="d-inline-flex col-12">
+                    <label for="startDate" class="col-4 text-end" style="margin-top:5px;">起始日期</label>
+                    <input type="date" class="form-control col-8" name="startDate" id="startDate" required>
+                </div>
+            </div>
+            <div class="col-md-6 mb-2 mb-md-0">
+                <div class="d-inline-flex col-12">
+                    <label for="endDate" class="col-4 text-end" style="margin-top:5px;">結束日期</label>
+                    <input type="date" class="form-control col-8" name="endDate" id="endDate" required>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-success w-100">查詢</button>
+            </div>
+            <div class="col-md-7"></div>
+            <div class="col-md-2">
+                <button type="reset" class="btn btn-warning w-100">清除</button>
+            </div>
+        </div>
+    </form>
+    <div class="table-container mt-4" style="width: 100%;">
+        <table class="display" id="table_id" style="display:none;width:100%;">
+            <thead>
+                <tr>
+                    <th>品號</th>
+                    <th>品名</th>
+                    <th>庫存量</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 這裡的數據將由 AJAX 加載 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 設定起始日期為今天
+    const today = new Date();
+    document.getElementById('startDate').value = today.toISOString().split('T')[0];
+
+    // 設定結束日期為一個月後的今天
+    const nextMonth = new Date();
+    nextMonth.setMonth(today.getMonth() + 1);
+    document.getElementById('endDate').value = nextMonth.toISOString().split('T')[0];
+
+    function validateDates() {
+        const startDate = new Date(document.getElementById('startDate').value);
+        const endDate = new Date(document.getElementById('endDate').value);
+        if (endDate < startDate) {
+            alert('結束日期必須晚於起始日期');
+            return false;
+        }
+        return true;
+    }
+
+    $(document).ready(function () {
+        // 初始化 DataTable
+        var table = $('#table_id').DataTable({
+            language: {
+                "lengthMenu": "顯示 _MENU_ 筆資料",
+                "sProcessing": "處理中...",
+                "sZeroRecords": "没有匹配结果",
+                "sInfo": "目前有 _MAX_ 筆資料",
+                "sInfoEmpty": "目前共有 0 筆紀錄",
+                "sInfoFiltered": " ",
+                "sInfoPostFix": "",
+                "sSearch": "搜尋:",
+                "sUrl": "",
+                "sEmptyTable": "尚未有資料紀錄存在",
+                "sLoadingRecords": "載入資料中...",
+                "sInfoThousands": ",",
+                "oPaginate": {
+                    "sFirst": "首頁",
+                    "sPrevious": "上一頁",
+                    "sNext": "下一頁",
+                    "sLast": "末頁"
+                },
+                "order": [[0, "desc"]],
+                "oAria": {
+                    "sSortAscending": ": 以升序排列此列",
+                    "sSortDescending": ": 以降序排列此列"
+                }
+            },
+            "processing": true,
+            "serverSide": false,
+            "ajax": {
+                "url": "@Url.Action("GetPredictedPartNos", "Home")", // AJAX 請求的 URL
+                "type": "GET",
+                "data": function (d) {
+                    d.startDate = $('#startDate').val(); // 傳遞起始日期
+                    d.endDate = $('#endDate').val(); // 傳遞結束日期
+                },
+                "error": function (xhr, error, code) {
+                    console.error("AJAX Error: ", code);
+                    console.error("XHR: ", xhr);
+                    alert('發生錯誤: ' + xhr.responseText);
+                }
+            },
+            "columns": [
+                { "data": "partNo" },
+                { "data": "name" },
+                { "data": "num" }
+            ],
+            "initComplete": function () {
+                $('#table_id').show(); // 表格初始化完成後顯示
+            }
+        });
+
+        // 查詢表單提交事件
+        $('#inventoryQueryForm').on('submit', function (e) {
+            e.preventDefault(); // 防止表單提交
+            table.ajax.reload(); // 重新加載表格數據
+        });
+    });
+</script>
