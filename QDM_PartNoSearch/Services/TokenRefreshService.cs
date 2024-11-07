@@ -63,7 +63,6 @@ namespace QDM_PartNoSearch.Services
                     "ReyiAccessToken",
                     "日翊"
                 );
-
             }
             catch (Exception ex)
             {
@@ -85,6 +84,7 @@ namespace QDM_PartNoSearch.Services
                 if (response.IsSuccessStatusCode)
                 {
                     string content = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation($"API 回應：{content}"); // 輸出回應內容
                     using (JsonDocument doc = JsonDocument.Parse(content))
                     {
                         if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement) &&

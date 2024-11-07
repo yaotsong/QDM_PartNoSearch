@@ -188,15 +188,17 @@ namespace QDM_PartNoSearch.Controllers
                 _ => null
             };
 
-            if (cacheKey == null || !_cache.TryGetValue(cacheKey, out string accessToken))
+            if (cacheKey == null || !_cache.TryGetValue(cacheKey, out string? accessToken))
             {
-                _logger.LogWarning("快取中找不到存取令牌。");
+                
+                _logger.LogWarning("快取中找不到存取令牌:{AccessToken}。",cacheKey);
                 return null;
             }
             try
             {
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
                 var response = await _httpClient.GetAsync(url);
+                _logger.LogInformation("API呼叫成功:{Response}",accessToken);
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogError("API 呼叫失敗: {ReasonPhrase}", response.ReasonPhrase);
@@ -290,7 +292,7 @@ namespace QDM_PartNoSearch.Controllers
                         }
                     }
                 }
-
+                _logger.LogInformation("!!!!!!!!!統整資料成功!!!!!!!!!!!");
                 return pageDataResponse;
             }
             catch (Exception ex)
