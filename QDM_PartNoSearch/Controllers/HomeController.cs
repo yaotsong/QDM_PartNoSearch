@@ -31,18 +31,7 @@ namespace QDM_PartNoSearch.Controllers
 
         public IActionResult PredictPartNo()
         {
-            //var invMB = _context.Invmbs
-            //     .Where(x => x.Mb064 != 0)
-            //     .Select(x => new
-            //     {
-            //         PartNo = x.Mb001.Trim(),
-            //         Name = x.Mb002.Trim(),
-            //         Num = x.Mb064
-            //     })
-            //     .ToList();
-
-            // 返回視圖並傳遞資料
-            return View(); // 確保你的視圖能夠正確顯示報告
+            return View(); 
         }
 
         public JsonResult GetPredictedPartNos(DateTime startDate, DateTime endDate)
@@ -52,35 +41,38 @@ namespace QDM_PartNoSearch.Controllers
                 .Where(p => p.DateTime >= startDate && p.DateTime <= endDate)
                 .ToList();
 
-            var invMB = _context.Invmbs
-                .Where(x => x.Mb064 != 0)
-                .Select(x => new
-                {
-                    Mb001 = x.Mb001.Trim(),
-                    Mb002 = x.Mb002.Trim(),
-                    Mb064 = x.Mb064
-                })
-                .ToList();
+            var invMC = (from mc in _context.Invmcs
+                         join mb in _context.Invmbs
+                         on mc.Mc001 equals mb.Mb001  // 根據 Mc001 和 Mb001 進行 join
+                         where mc.Mc007 != 0  // 過濾條件
+                         select new
+                         {
+                             Mc001 = mc.Mc001.Trim(),  // 去除 Mc001 字符串的空格
+                             Mc002 = mc.Mc002.Trim(),  // 去除 Mc002 字符串的空格
+                             Mc007 = mc.Mc007,
+                             Mb002 = mb.Mb002         // 假設 Invmbs 中有 Mb002 欄位
+                         }).ToList();
 
             // 儲存計算後庫存數量
             var formData = new List<object>();
 
-            foreach (var inv in invMB)
+            foreach (var inv in invMC)
             {
                 // 檢查 inv.Mb001 是否在 predictPartNos 中
                 var matchingPartNos = predictPartNos
-                    .Where(p => p.PartNo == inv.Mb001 && DateTime.Now <= p.DateTime)
+                    .Where(p => p.PartNo == inv.Mc001 && DateTime.Now <= p.DateTime)
                     .ToList();
 
-                // 計算加總
-                var totalNum = matchingPartNos.Any() ? matchingPartNos.Sum(p => p.Num) : 0;
+                // 計算加總 判斷庫別 加入數量
+                var totalNum = matchingPartNos.Any() ? matchingPartNos.Sum(p => p.Num) : 0; //這裡還沒判斷
 
                 // 創建新的條目並填充數據
                 var newEntry = new
                 {
-                    PartNo = inv.Mb001,
+                    StockNum = inv.Mc002,
+                    PartNo = inv.Mc001,
                     Name = inv.Mb002,
-                    Num = (int)inv.Mb064 + totalNum
+                    Num = inv.Mc007 //+ totalNum
                 };
 
                 formData.Add(newEntry);
@@ -111,10 +103,9 @@ namespace QDM_PartNoSearch.Controllers
                               select new
                               {
                                   MB001 = mb.Mb001,
-                                  MB002 = mb.Mb002,
-                                  MC001 = mc.Mc001
+                                  MB002 = mb.Mb002
                               };
-
+            var result = joinedQuery.ToList();  // 確保執行查詢
             if (!string.IsNullOrEmpty(q))
             {
                 joinedQuery = joinedQuery.Where(x => x.MB001.Contains(q) || x.MB002.Contains(q));

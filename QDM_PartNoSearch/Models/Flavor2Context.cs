@@ -942,7 +942,7 @@ public partial class Flavor2Context : DbContext
 
         modelBuilder.Entity<Invmc>(entity =>
         {
-            entity.HasKey(e => e.Mc001);
+            entity.HasKey(e => new { e.Mc001, e.Mc002 });
 
             entity.ToTable("INVMC");
 
@@ -955,6 +955,10 @@ public partial class Flavor2Context : DbContext
                 .HasMaxLength(60)
                 .HasDefaultValue("")
                 .HasColumnName("MC002");
+            entity.Property(e => e.Mc007)
+                .HasMaxLength(10)
+                .HasDefaultValue(0)
+                .HasColumnName("MC007");
         });
 
         modelBuilder.Entity<Invmh>(entity =>
