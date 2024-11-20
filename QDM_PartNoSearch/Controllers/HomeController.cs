@@ -46,7 +46,6 @@ namespace QDM_PartNoSearch.Controllers
                          join mb in _context.Invmbs
                          on mc.Mc001 equals mb.Mb001  // 根據 Mc001 和 Mb001 進行 join
                          where mc.Mc007 != 0  // 過濾條件
-                         && mc.Mc002 =="1527"
                          select new
                          {
                              Mc001 = mc.Mc001.Trim(),  // 去除 料號 字符串的空格
