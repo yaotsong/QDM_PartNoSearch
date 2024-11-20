@@ -40,6 +40,10 @@ namespace QDM_PartNoSearch.Models
                     .HasMaxLength(10)
                     .HasDefaultValue(null) // 預設值為 null
                     .HasColumnName("NUM");
+                entity.Property(e => e.StockNum)
+                   .HasMaxLength(10)
+                   .HasDefaultValue(null) // 預設值為 null
+                   .HasColumnName("StockNum");
             });
 
             OnModelCreatingPartial(modelBuilder);

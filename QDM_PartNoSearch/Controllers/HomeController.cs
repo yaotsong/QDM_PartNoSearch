@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using QDM_PartNoSearch.Models;
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace QDM_PartNoSearch.Controllers
@@ -45,12 +46,13 @@ namespace QDM_PartNoSearch.Controllers
                          join mb in _context.Invmbs
                          on mc.Mc001 equals mb.Mb001  // 根據 Mc001 和 Mb001 進行 join
                          where mc.Mc007 != 0  // 過濾條件
+                         && mc.Mc002 =="1527"
                          select new
                          {
-                             Mc001 = mc.Mc001.Trim(),  // 去除 Mc001 字符串的空格
-                             Mc002 = mc.Mc002.Trim(),  // 去除 Mc002 字符串的空格
-                             Mc007 = mc.Mc007,
-                             Mb002 = mb.Mb002         // 假設 Invmbs 中有 Mb002 欄位
+                             Mc001 = mc.Mc001.Trim(),  // 去除 料號 字符串的空格
+                             Mc002 = mc.Mc002.Trim(),  // 去除 庫別 字符串的空格
+                             Mc007 = mc.Mc007,          //庫存數量
+                             Mb002 = mb.Mb002         // 料名
                          }).ToList();
 
             // 儲存計算後庫存數量
@@ -58,13 +60,12 @@ namespace QDM_PartNoSearch.Controllers
 
             foreach (var inv in invMC)
             {
-                // 檢查 inv.Mb001 是否在 predictPartNos 中
-                var matchingPartNos = predictPartNos
-                    .Where(p => p.PartNo == inv.Mc001 && DateTime.Now <= p.DateTime)
-                    .ToList();
-
-                // 計算加總 判斷庫別 加入數量
-                var totalNum = matchingPartNos.Any() ? matchingPartNos.Sum(p => p.Num) : 0; //這裡還沒判斷
+                // 計算匹配的數量總和，使用 LINQ 直接計算總和
+                var totalNum = predictPartNos
+                    .Where(p => p.PartNo == inv.Mc001
+                                && DateTime.Now.Date <= p.DateTime // 過濾出預計出貨日期大於等於今天的記錄
+                                && p.StockNum == inv.Mc002) // 匹配庫別
+                    .Sum(x => x.Num.GetValueOrDefault());  // 使用 GetValueOrDefault() 來確保處理 null
 
                 // 創建新的條目並填充數據
                 var newEntry = new
@@ -72,9 +73,10 @@ namespace QDM_PartNoSearch.Controllers
                     StockNum = inv.Mc002,
                     PartNo = inv.Mc001,
                     Name = inv.Mb002,
-                    Num = inv.Mc007 //+ totalNum
+                    Num = inv.Mc007 + totalNum // 加上原始數量和計算的總和
                 };
 
+                // 將新的條目添加到 formData 集合
                 formData.Add(newEntry);
             }
             var Data = new { data = formData };

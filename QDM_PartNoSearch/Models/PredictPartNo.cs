@@ -5,5 +5,6 @@
         public DateTime DateTime { get; set; }
         public string? PartNo { get; set; }
         public int? Num { get; set; }
+        public string StockNum { get; set; }
     }
 }
