@@ -35,11 +35,11 @@ namespace QDM_PartNoSearch.Controllers
             return View(); 
         }
 
-        public JsonResult GetPredictedPartNos(DateTime startDate, DateTime endDate)
+        public JsonResult GetPredictedPartNos( DateTime endDate)
         {
             // 撈取 PredictPartNo 的所有資料
             var predictPartNos = _deanContext.PredictPartNo
-                .Where(p => p.DateTime >= startDate && p.DateTime <= endDate)
+                .Where(p => p.DateTime <= endDate)
                 .ToList();
 
             var invMC = (from mc in _context.Invmcs
@@ -72,7 +72,9 @@ namespace QDM_PartNoSearch.Controllers
                     StockNum = inv.Mc002,
                     PartNo = inv.Mc001,
                     Name = inv.Mb002,
-                    Num = inv.Mc007 + totalNum // 加上原始數量和計算的總和
+                    Num = inv.Mc007,
+                    PreNum = totalNum, // 加上原始數量和計算的總和
+                    TotalNum = inv.Mc007 + totalNum
                 };
 
                 // 將新的條目添加到 formData 集合

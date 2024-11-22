@@ -4,17 +4,11 @@
 
 <div class="container mt-4">
     <h3 class="mb-4">預估庫存查詢</h3>
-    <form id="inventoryQueryForm" onsubmit="return validateDates();">
-        <div class="row mb-3 align-items-center">
+    <form id="inventoryQueryForm">
+        <div class="row mb-3">
             <div class="col-md-6 mb-2 mb-md-0">
                 <div class="d-inline-flex col-12">
-                    <label for="startDate" class="col-4 text-end" style="margin-top:5px;">起始日期</label>
-                    <input type="date" class="form-control col-8" name="startDate" id="startDate" required>
-                </div>
-            </div>
-            <div class="col-md-6 mb-2 mb-md-0">
-                <div class="d-inline-flex col-12">
-                    <label for="endDate" class="col-4 text-end" style="margin-top:5px;">結束日期</label>
+                    <label for="endDate" class="col-4 text-end" style="margin-top:5px;">入庫日期</label>
                     <input type="date" class="form-control col-8" name="endDate" id="endDate" required>
                 </div>
             </div>
@@ -23,20 +17,23 @@
             <div class="col-md-3">
                 <button type="submit" class="btn btn-success w-100">查詢</button>
             </div>
-            <div class="col-md-7"></div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <button type="reset" class="btn btn-warning w-100">清除</button>
             </div>
+            <div class="col-md-6"></div>
         </div>
     </form>
-    <div class="table-container mt-4" style="width: 100%;">
-        <table class="display" id="table_id" style="display:none;width:100%;">
+    <hr />
+    <div class="table-container mt-4">
+        <table class="display" id="table_id">
             <thead>
                 <tr>
                     <th>庫別</th>
                     <th>品號</th>
                     <th>品名</th>
-                    <th>庫存量</th>
+                    <th>現有庫存量</th>
+                    <th>預估入庫量</th>
+                    <th>合計入庫量</th>
                 </tr>
             </thead>
             <tbody>
@@ -47,31 +44,21 @@
 </div>
 
 <script>
-    // 設定起始日期為今天
+    // 查詢日期為今天
     const today = new Date();
-    document.getElementById('startDate').value = today.toISOString().split('T')[0];
+    $("#endDate").val(today.toISOString().split('T')[0]);
 
-    // 設定結束日期為一個月後的今天
-    const nextMonth = new Date();
-    nextMonth.setMonth(today.getMonth() + 1);
-    document.getElementById('endDate').value = nextMonth.toISOString().split('T')[0];
-
-    function validateDates() {
-        const startDate = new Date(document.getElementById('startDate').value);
-        const endDate = new Date(document.getElementById('endDate').value);
-        if (endDate < startDate) {
-            alert('結束日期必須晚於起始日期');
-            return false;
-        }
-        return true;
-    }
 
     $(document).ready(function () {
         // 初始化 DataTable
         var table = $('#table_id').DataTable({
+            scrollY: '400px',
+            scrollCollapse: true,
+            fixedHeader: true,
+            processing: true,
+            serverSide: false,
             language: {
                 "lengthMenu": "顯示 _MENU_ 筆資料",
-                "sProcessing": "處理中...",
                 "sZeroRecords": "没有匹配结果",
                 "sInfo": "目前有 _MAX_ 筆資料",
                 "sInfoEmpty": "目前共有 0 筆紀錄",
@@ -94,13 +81,10 @@
                     "sSortDescending": ": 以降序排列此列"
                 }
             },
-            "processing": true,
-            "serverSide": false,
             "ajax": {
                 "url": "@Url.Action("GetPredictedPartNos", "Home")", // AJAX 請求的 URL
                 "type": "GET",
                 "data": function (d) {
-                    d.startDate = $('#startDate').val(); // 傳遞起始日期
                     d.endDate = $('#endDate').val(); // 傳遞結束日期
                 },
                 "error": function (xhr, error, code) {
@@ -113,7 +97,9 @@
                 { "data": "stockNum"},
                 { "data": "partNo" },
                 { "data": "name" },
-                { "data": "num" }
+                { "data": "num" },
+                { "data": "preNum" },
+                { "data": "totalNum" }
             ],
             "initComplete": function () {
                 $('#table_id').show(); // 表格初始化完成後顯示
