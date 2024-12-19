@@ -92,7 +92,7 @@ namespace QDM_PartNoSearch.Controllers
         public async Task<List<WmsProduct>> GetOrderDataAsync(List<WmsProduct> data, string market)
         {
             DateTime today = DateTime.Today;
-            //DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
+            // DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
             DateTime firstDayOfMonth = today.AddDays(-60); //調整訂單起始天數 從前60天開始
             var dataDict = data.ToDictionary(item => item.Id);
             var orderAllData = new Dictionary<string, Tuple<int, string>>();
@@ -133,6 +133,12 @@ namespace QDM_PartNoSearch.Controllers
 
                 foreach (var order in orderList)
                 {
+                    if (string.IsNullOrEmpty(order.sku))
+                    {
+                        _logger.LogWarning("Encountered an order with null or empty SKU: {OrderId}", order.sku);
+                        continue; // 跳過這筆資料，避免將 null 的 sku 加入字典
+                    }
+
                     if (orderAllData.ContainsKey(order.sku))
                     {
                         var existing = orderAllData[order.sku];
@@ -152,6 +158,12 @@ namespace QDM_PartNoSearch.Controllers
 
             foreach (var kvp in orderAllData)
             {
+                if (kvp.Key == null)
+                {
+                    _logger.LogWarning("Encountered a null SKU in orderAllData.");
+                    continue; // 跳過這筆資料，避免將 null 的 sku 加入 dataDict
+                }
+
                 if (dataDict.TryGetValue(kvp.Key, out var existingItem))
                 {
                     existingItem.Qty += kvp.Value.Item1;
@@ -160,11 +172,11 @@ namespace QDM_PartNoSearch.Controllers
                 {
                     dataDict[kvp.Key] = new WmsProduct { Id = kvp.Key, Qty = kvp.Value.Item1, Name = "(不在日翊庫存)" + kvp.Value.Item2 };
                 }
-
             }
 
             return dataDict.Values.ToList();
         }
+
 
         private async Task<PageDataResponse> GetPageDataAsync(string apiName, int pageNumber, string skuString = "", DateTime? date = null)
         {
