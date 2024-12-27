@@ -45,11 +45,14 @@ namespace QDM_PartNoSearch.Controllers
             var invMC = (from mc in _context.Invmcs
                          join mb in _context.Invmbs
                          on mc.Mc001 equals mb.Mb001  // 根據 Mc001 和 Mb001 進行 join
+                         join smc in _context.Cmsmcs
+                         on mc.Mc002 equals smc.Mc001
                          where mc.Mc007 != 0  // 過濾條件
                          select new
                          {
                              Mc001 = mc.Mc001.Trim(),  // 去除 料號 字符串的空格
                              Mc002 = mc.Mc002.Trim(),  // 去除 庫別 字符串的空格
+                             Smc002 = smc.Mc002.Trim(), // 去除 庫別名稱 的空格
                              Mc007 = mc.Mc007,          //庫存數量
                              Mb002 = mb.Mb002         // 料名
                          }).ToList();
@@ -70,6 +73,7 @@ namespace QDM_PartNoSearch.Controllers
                 var newEntry = new
                 {
                     StockNum = inv.Mc002,
+                    StockName = inv.Smc002,
                     PartNo = inv.Mc001,
                     Name = inv.Mb002,
                     Num = inv.Mc007,

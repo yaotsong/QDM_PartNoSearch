@@ -29,6 +29,7 @@
             <thead>
                 <tr>
                     <th>庫別</th>
+                    <th>庫別名稱</th>
                     <th>品號</th>
                     <th>品名</th>
                     <th>現有庫存量</th>
@@ -95,6 +96,7 @@
             },
             "columns": [
                 { "data": "stockNum"},
+                { "data": "stockName"},
                 { "data": "partNo" },
                 { "data": "name" },
                 { "data": "num" },
@@ -103,7 +105,19 @@
             ],
             "initComplete": function () {
                 $('#table_id').show(); // 表格初始化完成後顯示
-            }
+            },
+            "columnDefs": [{
+                targets: [0,1,2],
+                width: "10%",
+                className: "text-center"
+            }, {
+                targets: [4,5,6],
+                width: "12%",
+                className: "text-center"
+            }, {
+                targets: [3],
+                width: "34%"
+            }]
         });
 
         // 查詢表單提交事件
