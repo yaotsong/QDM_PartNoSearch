@@ -186,7 +186,7 @@ namespace QDM_PartNoSearch.Controllers
             {
                 "條件式篩選商品" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/product/pro_query.php?nowpage={pageNumber}&pagesize=100",
                 "查詢庫存" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/inventory/stock_query.php?sku={skuString}",
-                "日翊條件式篩選訂單" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,hand",
+                "日翊條件式篩選訂單" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,hand,shopee",
                 "暢流條件式篩選訂單" => $"https://192.168.1.100/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,qdm_excel2",
                 _ => throw new ArgumentException("無效的 API 名稱", nameof(apiName))
             };
