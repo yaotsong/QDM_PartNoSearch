@@ -1,0 +1,32 @@
+﻿<div class="container mt-4">
+    <h3 class="mb-4">退貨單查詢</h3>
+    <form id="dynamicForm" method="post" asp-action="Index">
+        <div id="inputContainer">
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-5 mb-2 mb-md-0">
+                    <div class="d-inline-flex col-12">
+                        <div class="col-4" style="margin-top:3px;text-align:right">起始日期</div>
+                        <div class="col-8">
+                            <input type="date" id="datepicker" class="form-control" name="QueryDate" />
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-success w-100" type="submit">
+                        <i class="fas fa-search"></i> 查詢
+                    </button>
+                </div>
+                <div class="col-md-12">
+                    <div class="col-12" style="margin-top:3px;color:red;">備註:系統會依照起始日期往後撈取，ATM轉帳已付款且狀態為待處理的退貨單資料</div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    $(document).ready(function () {
+        var today = new Date().toISOString().split('T')[0];  // 獲取今天的日期並格式化為 yyyy-mm-dd
+        $('#datepicker').val(today);  // 設定日期欄位的值為今天
+    });
+</script>
