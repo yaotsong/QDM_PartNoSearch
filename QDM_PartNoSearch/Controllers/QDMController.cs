@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using ClosedXML.Excel;
 using Microsoft.Extensions.Caching.Memory;
 using QDM_PartNoSearch.Models;
+using System.Text.RegularExpressions;
 
 namespace QDM_PartNoSearch.Controllers
 {
@@ -55,7 +56,7 @@ namespace QDM_PartNoSearch.Controllers
             _cache.TryGetValue("QDMAccessToken", out string? accessToken);
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            var today = queryDate;
+            var today = DateTime.Today;
 
             string createdAtMin = queryDate.ToString("yyyy-MM-dd");
             string createdAtMax = today.ToString("yyyy-MM-dd");
@@ -92,17 +93,51 @@ namespace QDM_PartNoSearch.Controllers
 
                 foreach (var item in result)
                 {
+                    //拆分退貨明細裡的退貨銀行輸入欄位
+                    var bank_Info = item["return_return_bank"].ToString();
+                    var lines = bank_Info.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    // 預設變數
+                    string bank_name = string.Empty;
+                    string bank_branch = string.Empty;
+                    string bank_account = string.Empty;
+                    string bank_user = string.Empty;
+
+                    // 抓取每行冒號後的文字並分配給相對應的變數
+                    if (lines.Length >= 1)
+                    {
+                        var match1 = Regex.Match(lines[0], @"[：:]\s*([^．]+)");
+                        if (match1.Success) bank_name = match1.Groups[1].Value;
+                    }
+
+                    if (lines.Length >= 2)
+                    {
+                        var match2 = Regex.Match(lines[1], @"[：:]\s*([^．]+)");
+                        if (match2.Success) bank_branch = match2.Groups[1].Value;
+                    }
+
+                    if (lines.Length >= 3)
+                    {
+                        var match3 = Regex.Match(lines[2], @"[：:]\s*([^．]+)");
+                        if (match3.Success) bank_account = match3.Groups[1].Value;
+                    }
+
+                    if (lines.Length >= 4)
+                    {
+                        var match4 = Regex.Match(lines[3], @"[：:]\s*([^．]+)");
+                        if (match4.Success) bank_user = match4.Groups[1].Value;
+                    }
+
                     if (item["payment_method"].ToString() == "ATM轉帳")
                     {
                         var orderInfo = new Dictionary<string, string>
                         {
-                            { "order_id", item["order_id"].ToString() },
-                            { "payment_method", item["payment_method"].ToString() },
-                            { "date_added", item["date_added"].ToString() },
-                            { "return_name", item["return_name"].ToString() },
-                            { "return_email", item["return_email"].ToString() },
-                            { "return_telephone", item["return_telephone"].ToString() },
-                            { "return_return_bank", item["return_return_bank"].ToString() }
+                            { "order_id", item["order_id"].ToString() }, //訂單編號
+                            { "total", item["total"].ToString() }, //訂單總金額
+                            { "bank_id", "" },
+                            { "bank_name", bank_name },
+                            { "bank_branch", bank_branch },
+                            { "bank_account", bank_account },
+                            { "bank_user", bank_user },
                         };
                         extractedData.Add(orderInfo);
                     }
@@ -111,24 +146,24 @@ namespace QDM_PartNoSearch.Controllers
                 var workbook = new XLWorkbook();
                 var worksheet = workbook.Worksheets.Add("Orders");
 
-                worksheet.Cell(1, 1).Value = "訂單編號";
-                worksheet.Cell(1, 2).Value = "付款方式";
-                worksheet.Cell(1, 3).Value = "購買日期";
-                worksheet.Cell(1, 4).Value = "姓名";
-                worksheet.Cell(1, 5).Value = "電子郵件";
-                worksheet.Cell(1, 6).Value = "電話";
-                worksheet.Cell(1, 7).Value = "收貨地址";
+                worksheet.Cell(1, 1).Value = "單號";
+                worksheet.Cell(1, 2).Value = "銀行代號";
+                worksheet.Cell(1, 3).Value = "銀行";
+                worksheet.Cell(1, 4).Value = "分行";
+                worksheet.Cell(1, 5).Value = "銀行帳戶";
+                worksheet.Cell(1, 6).Value = "戶名";
+                worksheet.Cell(1, 7).Value = "金額";
 
                 int row = 2;
                 foreach (var data in extractedData)
                 {
                     worksheet.Cell(row, 1).Value = data["order_id"];
-                    worksheet.Cell(row, 2).Value = data["payment_method"];
-                    worksheet.Cell(row, 3).Value = data["date_added"];
-                    worksheet.Cell(row, 4).Value = data["return_name"];
-                    worksheet.Cell(row, 5).Value = data["return_email"];
-                    worksheet.Cell(row, 6).Value = data["return_telephone"];
-                    worksheet.Cell(row, 7).Value = data["return_return_bank"];
+                    worksheet.Cell(row, 2).Value = data["bank_id"];
+                    worksheet.Cell(row, 3).Value = data["bank_name"];
+                    worksheet.Cell(row, 4).Value = data["bank_branch"];
+                    worksheet.Cell(row, 5).Value = data["bank_account"];
+                    worksheet.Cell(row, 6).Value = data["bank_user"];
+                    worksheet.Cell(row, 7).Value = data["total"];
                     row++;
                 }
 
