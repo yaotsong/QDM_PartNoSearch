@@ -1,4 +1,8 @@
-﻿<div class="container mt-4">
+﻿@{
+    ViewData["Title"] = "QDM退貨單查詢";
+}
+
+<div class="container mt-4">
     <h3 class="mb-4">退貨單查詢</h3>
     <form id="dynamicForm" method="post" asp-action="Index">
         <div id="inputContainer">
@@ -17,7 +21,7 @@
                     </button>
                 </div>
                 <div class="col-md-12">
-                    <div class="col-12" style="margin-top:3px;color:red;">備註:系統會依照起始日期往後撈取，ATM轉帳已付款且狀態為待處理的退貨單資料</div>
+                    <div class="col-12" style="margin-top:3px;color:red;">備註:系統會依照起始日期往後撈取到今天的日期，<br />撈取範圍:ATM轉帳已付款且狀態為待處理的退貨單資料</div>
                 </div>
             </div>
         </div>
