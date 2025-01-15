@@ -49,6 +49,7 @@ namespace QDM_PartNoSearch.Controllers
 
             return View("Index", model);
         }
+        //QDM退貨單匯出EXCEL
         public async Task<byte[]> GetExcelData(DateTime queryDate)
         {
 
