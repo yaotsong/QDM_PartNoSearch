@@ -93,7 +93,7 @@ namespace QDM_PartNoSearch.Controllers
         public class DailyInventory
         {
             public DateTime Date { get; set; }
-            public string PartNo { get; set; }
+            public string? PartNo { get; set; }
             public int Quantity { get; set; }
         }
 

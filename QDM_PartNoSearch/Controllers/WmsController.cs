@@ -316,8 +316,8 @@ namespace QDM_PartNoSearch.Controllers
 
         public class PageDataResponse
         {
-            public List<WmsProduct> Products { get; set; }
-            public List<WmsOrder> Orders { get; set; }
+            public List<WmsProduct>? Products { get; set; }
+            public List<WmsOrder>? Orders { get; set; }
             public int MaxPage { get; set; }
         }
 
