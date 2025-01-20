@@ -18,6 +18,8 @@ public partial class Flavor2Context : DbContext
     public virtual DbSet<Invmc> Invmcs { get; set; }
     public virtual DbSet<Invmh> Invmhs { get; set; }
     public virtual DbSet<Cmsmc> Cmsmcs { get; set; }
+    public virtual DbSet<Coptg> Coptgs { get; set; }
+    public virtual DbSet<Copth> Copths { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("Chinese_Taiwan_Stroke_BIN");
@@ -996,6 +998,98 @@ public partial class Flavor2Context : DbContext
                 .HasMaxLength(20)
                 .HasDefaultValue("")
                 .HasColumnName("MC002");
+        });
+
+        modelBuilder.Entity<Coptg>(entity =>
+        {
+            // 設置複合主鍵
+            entity.HasKey(e => new { e.TG001, e.TG002 });
+
+            entity.ToTable("COPTG");
+
+            entity.Property(e => e.TG001)
+                .HasMaxLength(4)
+                .HasDefaultValue("")
+                .IsFixedLength()
+                .HasColumnName("TG001");
+            entity.Property(e => e.TG002)
+                .HasMaxLength(11)
+                .HasDefaultValue("")
+                .HasColumnName("TG002");
+            entity.Property(e => e.TG003)
+                .HasMaxLength(8)
+                .HasDefaultValue("")
+                .HasColumnName("TG003");
+            entity.Property(e => e.TG004)
+                .HasMaxLength(10)
+                .HasDefaultValue("")
+                .HasColumnName("TG004");
+            entity.Property(e => e.TG015)
+                .HasMaxLength(20)
+                .HasDefaultValue("")
+                .HasColumnName("TG015");
+            entity.Property(e => e.TG106)
+                .HasMaxLength(20)
+                .HasDefaultValue("")
+                .HasColumnName("TG106");
+            entity.Property(e => e.TG029)
+                .HasMaxLength(20)
+                .HasDefaultValue("")
+                .HasColumnName("TG029");
+            entity.Property(e => e.TG007)
+                .HasMaxLength(255)
+                .HasDefaultValue("")
+                .HasColumnName("TG007");
+            entity.Property(e => e.TG076)
+                .HasMaxLength(60)
+                .HasDefaultValue("")
+                .HasColumnName("TG076");
+        });
+
+        modelBuilder.Entity<Copth>(entity =>
+        {
+            // 設置複合主鍵
+            entity.HasKey(e => new { e.TH001, e.TH002 });
+
+            entity.ToTable("COPTH");
+
+            entity.Property(e => e.TH001)
+                .HasMaxLength(4)
+                .HasDefaultValue("")
+                .IsFixedLength()
+                .HasColumnName("TH001");
+            entity.Property(e => e.TH002)
+                .HasMaxLength(11)
+                .HasDefaultValue("")
+                .HasColumnName("TH002");
+            entity.Property(e => e.TH004)
+                .HasMaxLength(40)
+                .HasDefaultValue("")
+                .HasColumnName("TH004");
+            entity.Property(e => e.TH005)
+                .HasMaxLength(60)
+                .HasDefaultValue("")
+                .HasColumnName("TH005");
+            entity.Property(e => e.TH007)
+                .HasMaxLength(10)
+                .HasDefaultValue("")
+                .HasColumnName("TH007");
+            entity.Property(e => e.TH008)
+                .HasMaxLength(11)
+                .HasDefaultValue(0)
+                .HasColumnName("TH008");
+            entity.Property(e => e.TH012)
+                .HasMaxLength(15)
+                .HasDefaultValue(0)
+                .HasColumnName("TH012");
+            entity.Property(e => e.TH013)
+                .HasMaxLength(15)
+                .HasDefaultValue(0)
+                .HasColumnName("TH013");
+            entity.Property(e => e.TH017)
+                .HasMaxLength(20)
+                .HasDefaultValue("")
+                .HasColumnName("TH017");
         });
 
         OnModelCreatingPartial(modelBuilder);
