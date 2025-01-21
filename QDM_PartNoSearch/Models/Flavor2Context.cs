@@ -1075,15 +1075,12 @@ public partial class Flavor2Context : DbContext
                 .HasDefaultValue("")
                 .HasColumnName("TH007");
             entity.Property(e => e.TH008)
-                .HasMaxLength(11)
                 .HasDefaultValue(0)
                 .HasColumnName("TH008");
             entity.Property(e => e.TH012)
-                .HasMaxLength(15)
                 .HasDefaultValue(0)
                 .HasColumnName("TH012");
             entity.Property(e => e.TH013)
-                .HasMaxLength(15)
                 .HasDefaultValue(0)
                 .HasColumnName("TH013");
             entity.Property(e => e.TH017)
