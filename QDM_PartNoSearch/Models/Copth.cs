@@ -13,11 +13,11 @@
         //庫別
         public string? TH007 { get; set; }
         //數量
-        public int TH008 { get; set; }
+        public decimal TH008 { get; set; }
         //單價
-        public int TH012 { get; set; }
+        public decimal TH012 { get; set; }
         //金額
-        public int TH013 { get; set; }
+        public decimal TH013 { get; set; }
         //批號
         public string? TH017 { get; set; }
     }
