@@ -4,6 +4,7 @@
 
 <div class="container mt-4">
     <h3 class="mb-4">退貨單查詢</h3>
+    <!-- 第一個表單 - ATM -->
     <form id="dynamicForm" method="post" asp-action="Index">
         <div id="inputContainer">
             <div class="row mb-3 align-items-center">
@@ -12,16 +13,43 @@
                         <div class="col-4" style="margin-top:3px;text-align:right">起始日期</div>
                         <div class="col-8">
                             <input type="date" id="datepicker" class="form-control" name="QueryDate" />
+                            <input type="hidden" name="Pandin" value="ATM" />
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <button class="btn btn-success w-100" type="submit">
-                        <i class="fas fa-search"></i> 查詢
+                        <i class="fa fa-file-excel-o"></i> 匯出ATM已付款資料
                     </button>
                 </div>
                 <div class="col-md-12">
                     <div class="col-12" style="margin-top:3px;color:red;">備註:系統會依照起始日期往後撈取到今天的日期，<br />撈取範圍:ATM轉帳已付款且狀態為待處理的退貨單資料</div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <h3 class="mb-4">批次匯出EPR退貨單報表</h3>
+    <!-- 第二個表單 - ERP -->
+    <form id="ERPForm" method="post" asp-action="Index">
+        <div>
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-5 mb-2 mb-md-0">
+                    <div class="d-inline-flex col-12">
+                        <div class="col-4" style="margin-top:3px;text-align:right">選擇日期</div>
+                        <div class="col-8">
+                            <input type="date" id="datepicker1" class="form-control" name="QueryDate" />
+                            <input type="hidden" name="Pandin" value="ERP" />
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-success w-100" type="submit">
+                        <i class="fa fa-file-excel-o"></i> 匯出EPR退貨單
+                    </button>
+                </div>
+                <div class="col-md-12">
+                    <div class="col-12" style="margin-top:3px;color:red;">備註:系統只撈取單一日期</div>
                 </div>
             </div>
         </div>
@@ -32,5 +60,6 @@
     $(document).ready(function () {
         var today = new Date().toISOString().split('T')[0];  // 獲取今天的日期並格式化為 yyyy-mm-dd
         $('#datepicker').val(today);  // 設定日期欄位的值為今天
+        $('#datepicker1').val(today);  // 設定日期欄位的值為今天
     });
 </script>
