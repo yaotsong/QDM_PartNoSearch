@@ -10,6 +10,8 @@
         public string? TG003 { get; set; }
         //客戶代號
         public string? TG004 { get; set; }
+        //發票號碼
+        public string? TG014 { get; set; }
         //統一編號
         public string? TG015 { get; set; }
         //連絡電話(一)
