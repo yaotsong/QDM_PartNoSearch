@@ -82,7 +82,7 @@ namespace QDM_PartNoSearch.Controllers
 
 
                 // 返回 Excel 檔案下載
-                return File(fileContent, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "退貨單查詢結果.xlsx");
+                return File(fileContent, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{check}退貨查詢結果.xlsx");
             }
 
             return View("Index", model);
@@ -294,10 +294,12 @@ namespace QDM_PartNoSearch.Controllers
                                     CopthData = copth
                                 };
             //比對銷貨單備註三欄位 = 暢流退貨訂單單號
+            var hashSet = new HashSet<string>(list);  
             var result = PurchaseOrder
                 .AsEnumerable()
-                .Where(x => list.Contains(x.CoptgData.TG029))
+                .Where(x => hashSet.Contains(x.CoptgData.TG029))
                 .ToList();
+
 
             return result;
         }
@@ -325,7 +327,7 @@ namespace QDM_PartNoSearch.Controllers
             worksheet.Cell(1, 16).Value = "網路訂單編號";
             worksheet.Cell(1, 17).Value = "客戶全名";
             worksheet.Cell(1, 18).Value = "收貨人";
-
+            worksheet.Cell(1, 19).Value = "銷退原因代號";
             int row = 2;
             foreach (var info in data)
             {
@@ -347,16 +349,9 @@ namespace QDM_PartNoSearch.Controllers
                 worksheet.Cell(row, 16).Value = info.CoptgData.TG029;
                 worksheet.Cell(row, 17).Value = info.CoptgData.TG007;
                 worksheet.Cell(row, 18).Value = info.CoptgData.TG076;
+                worksheet.Cell(row, 19).Value = "RZ";
                 row++;
             }
-
-            //worksheet.Column(1).Width = 12;
-            //worksheet.Column(2).Width = 10;
-            //worksheet.Column(3).Width = 25;
-            //worksheet.Column(4).Width = 12;
-            //worksheet.Column(5).Width = 25;
-            //worksheet.Column(6).Width = 12;
-            //worksheet.Column(7).Width = 80;
 
             using (var memoryStream = new System.IO.MemoryStream())
             {
