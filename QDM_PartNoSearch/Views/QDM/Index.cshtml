@@ -3,7 +3,7 @@
 }
 
 <div class="container mt-4">
-    <h3 class="mb-4">退貨單查詢</h3>
+    <h3 class="mb-4">ATM退貨單查詢</h3>
     <!-- 第一個表單 - ATM -->
     <form id="dynamicForm" method="post" asp-action="Index">
         <div id="inputContainer">
@@ -19,11 +19,11 @@
                 </div>
                 <div class="col-md-3">
                     <button class="btn btn-success w-100" type="submit">
-                        <i class="fa fa-file-excel-o"></i> 匯出ATM已付款資料
+                        <i class="fa fa-file-excel"></i> 匯出ATM已付款資料
                     </button>
                 </div>
-                <div class="col-md-12">
-                    <div class="col-12" style="margin-top:3px;color:red;">備註:系統會依照起始日期往後撈取到今天的日期，<br />撈取範圍:ATM轉帳已付款且狀態為待處理的退貨單資料</div>
+                <div class="col-md-4">
+                    <div class="col-12" style="margin-top:3px;color:red;">備註:系統會依照起始日期往後撈取到今天的日期，撈取範圍:ATM轉帳已付款且狀態為待處理的退貨單資料</div>
                 </div>
             </div>
         </div>
@@ -45,10 +45,10 @@
                 </div>
                 <div class="col-md-3">
                     <button class="btn btn-success w-100" type="submit">
-                        <i class="fa fa-file-excel-o"></i> 匯出EPR退貨單
+                        <i class="fa fa-file-excel"></i> 匯出EPR退貨單
                     </button>
                 </div>
-                <div class="col-md-12">
+                <div class="col-md-4">
                     <div class="col-12" style="margin-top:3px;color:red;">備註:系統只撈取單一日期</div>
                 </div>
             </div>
