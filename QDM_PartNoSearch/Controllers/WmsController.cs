@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System;
 using QDM_PartNoSearch.Models;
 using Microsoft.EntityFrameworkCore;
+using DocumentFormat.OpenXml.Spreadsheet;
 
 namespace QDM_PartNoSearch.Controllers
 {
@@ -55,11 +56,30 @@ namespace QDM_PartNoSearch.Controllers
             return productData;
         }
 
-        // API 抓商品庫存用，並將庫存數字合併商品 list
-        public async Task<List<WmsProduct>> GetStockDataAsync(List<WmsProduct> data)
+        // API判斷商品條件是否上下架
+        public async Task<List<WmsProduct>> GetProductStatusAsync(List<WmsProduct> data)
+        {
+            
+            if (data.Any())
+            {
+                var responsesList = new List<WmsProduct>();
+                foreach (var item in data)
+                {
+                    var check = await GetPageDataAsync("查詢產品細節", 1, item.Id);
+                    if (check.status)
+                    {
+                        responsesList.Add(item);
+                    }
+                }
+                data = responsesList;
+            }
+            return data;
+        }
+
+        // API抓商品庫存用，並將庫存數字合併商品 list
+        public async Task<List<WmsProduct>> GetStockDataAsync(List<WmsProduct> data) 
         {
             var responsesList = new List<WmsProduct>();
-
             if (data.Any())
             {
                 var allSkuData = GroupIds(data);
@@ -185,6 +205,7 @@ namespace QDM_PartNoSearch.Controllers
             string url = apiName switch
             {
                 "條件式篩選商品" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/product/pro_query.php?nowpage={pageNumber}&pagesize=100",
+                "查詢產品細節" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/product/pro_detail.php?sku={skuString}",
                 "查詢庫存" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/inventory/stock_query.php?sku={skuString}",
                 "日翊條件式篩選訂單" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,hand,shopee",
                 "暢流條件式篩選訂單" => $"https://192.168.1.100/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,qdm_excel2",
@@ -194,6 +215,7 @@ namespace QDM_PartNoSearch.Controllers
             string? cacheKey = apiName switch
             {
                 "條件式篩選商品" => "ReyiAccessToken",
+                "查詢產品細節" => "ReyiAccessToken",
                 "查詢庫存" => "ReyiAccessToken",
                 "日翊條件式篩選訂單" => "ReyiAccessToken",
                 "暢流條件式篩選訂單" => "FlavorAccessToken",
@@ -218,6 +240,7 @@ namespace QDM_PartNoSearch.Controllers
                 }
 
                 var content = await response.Content.ReadAsStringAsync();
+                //存取產品料號資料用
                 var pageDataResponse = new PageDataResponse();
 
                 using (var doc = JsonDocument.Parse(content))
@@ -225,69 +248,79 @@ namespace QDM_PartNoSearch.Controllers
                     var dataElement = doc.RootElement.GetProperty("data");
                     if (dataElement.ValueKind == JsonValueKind.Object)
                     {
-                        var rowsElement = dataElement.GetProperty("rows");
-                        if (rowsElement.ValueKind == JsonValueKind.Array)
+                        //查詢產品資料格式與其他api回傳格式不同,並且只要回傳ture(上架) or false (下架) 就好
+                        if (apiName == "查詢產品細節")
                         {
-                            foreach (var row in rowsElement.EnumerateArray())
+                            var status = dataElement.GetProperty("status").GetBoolean();
+                            pageDataResponse.status = status;
+                            return pageDataResponse;
+                        }
+                        else
+                        {
+                            var rowsElement = dataElement.GetProperty("rows");
+                            if (rowsElement.ValueKind == JsonValueKind.Array)
                             {
-                                if (apiName == "條件式篩選商品")
+                                foreach (var row in rowsElement.EnumerateArray())
                                 {
-                                    var id = row.GetProperty("id").GetString();
-                                    var name = row.GetProperty("name").GetString();
-                                    pageDataResponse.Products ??= new List<WmsProduct>();
-                                    pageDataResponse.Products.Add(new WmsProduct { Id = id, Name = name });
-                                }
-                                else if (apiName == "查詢庫存")
-                                {
-                                    var sku = row.GetProperty("sku").GetString();   //商品編號
-                                    var stock = row.GetProperty("stock").GetInt32(); //庫存數
-                                    var name = row.GetProperty("name").GetString(); //商品名稱
-                                    var occupied_stock = row.GetProperty("occupied_stock").GetInt32(); //占用庫存
-                                    pageDataResponse.Products ??= new List<WmsProduct>();
-                                    pageDataResponse.Products.Add(new WmsProduct { Id = sku, Name = name, Stock = stock });
-                                }
-                                else if (apiName == "日翊條件式篩選訂單" || apiName == "暢流條件式篩選訂單")
-                                {
-                                    var source_key = row.GetProperty("source_key").GetString(); //來源的EC平台
-                                    var statusCode = row.GetProperty("status_code").GetString(); //訂單狀態碼:F待處理/W轉單中/P轉揀貨
-                                    var statusName = row.GetProperty("status_name").GetString();
-
-                                    var productsElement = row.GetProperty("products");
-                                    if (productsElement.ValueKind == JsonValueKind.Array)
+                                    if (apiName == "條件式篩選商品")
                                     {
-                                        foreach (var product in productsElement.EnumerateArray())
+                                        var id = row.GetProperty("id").GetString();
+                                        var name = row.GetProperty("name").GetString();
+                                        pageDataResponse.Products ??= new List<WmsProduct>();
+                                        pageDataResponse.Products.Add(new WmsProduct { Id = id, Name = name });
+                                    }
+                                    else if (apiName == "查詢庫存")
+                                    {
+                                        var sku = row.GetProperty("sku").GetString();   //商品編號
+                                        var stock = row.GetProperty("stock").GetInt32(); //庫存數
+                                        var name = row.GetProperty("name").GetString(); //商品名稱
+                                        var occupied_stock = row.GetProperty("occupied_stock").GetInt32(); //占用庫存
+                                        pageDataResponse.Products ??= new List<WmsProduct>();
+                                        pageDataResponse.Products.Add(new WmsProduct { Id = sku, Name = name, Stock = stock });
+                                    }
+                                    else if (apiName == "日翊條件式篩選訂單" || apiName == "暢流條件式篩選訂單")
+                                    {
+                                        var source_key = row.GetProperty("source_key").GetString(); //來源的EC平台
+                                        var statusCode = row.GetProperty("status_code").GetString(); //訂單狀態碼:F待處理/W轉單中/P轉揀貨
+                                        var statusName = row.GetProperty("status_name").GetString();
+
+                                        var productsElement = row.GetProperty("products");
+                                        if (productsElement.ValueKind == JsonValueKind.Array)
                                         {
-                                            var productType = product.GetProperty("type").GetString(); // 商品類型
-                                            var sku = product.GetProperty("sku").GetString();
-                                            var qty = product.GetProperty("qty").GetInt32();
-                                            var name = product.GetProperty("name").GetString();
-
-                                            if (source_key == "hand") // 人工開單不用到items層
+                                            foreach (var product in productsElement.EnumerateArray())
                                             {
-                                                pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
-                                            }
-                                            else
-                                            {
-                                                var itemsElement = product.GetProperty("items");
+                                                var productType = product.GetProperty("type").GetString(); // 商品類型
+                                                var sku = product.GetProperty("sku").GetString();
+                                                var qty = product.GetProperty("qty").GetInt32();
+                                                var name = product.GetProperty("name").GetString();
 
-                                                if (itemsElement.ValueKind == JsonValueKind.Array)
+                                                if (source_key == "hand") // 人工開單不用到items層
                                                 {
-                                                    //原先要判斷有沒有展開料號，但發現暢流規則很難定義 放棄顯示未展開提示，只記錄為在日翊暢流的料
-                                                    if (itemsElement.GetArrayLength() == 0 && (productType == "combine" || productType == "shop"))
+                                                    pageDataResponse.Orders ??= new List<WmsOrder>();
+                                                    pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
+                                                }
+                                                else
+                                                {
+                                                    var itemsElement = product.GetProperty("items");
+
+                                                    if (itemsElement.ValueKind == JsonValueKind.Array)
                                                     {
-                                                        pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                        pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
-                                                    }
-                                                    else
-                                                    {
-                                                        foreach (var item in itemsElement.EnumerateArray())
+                                                        //原先要判斷有沒有展開料號，但發現暢流規則很難定義 放棄顯示未展開提示，只記錄為在日翊暢流的料
+                                                        if (itemsElement.GetArrayLength() == 0 && (productType == "combine" || productType == "shop"))
                                                         {
-                                                            var itemSku = item.GetProperty("sku").GetString();
-                                                            var itemQty = item.GetProperty("qty").GetInt32();
-                                                            var itemName = item.GetProperty("name").GetString();
                                                             pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                            pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = itemSku, name = itemName, qty = itemQty });
+                                                            pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
+                                                        }
+                                                        else
+                                                        {
+                                                            foreach (var item in itemsElement.EnumerateArray())
+                                                            {
+                                                                var itemSku = item.GetProperty("sku").GetString();
+                                                                var itemQty = item.GetProperty("qty").GetInt32();
+                                                                var itemName = item.GetProperty("name").GetString();
+                                                                pageDataResponse.Orders ??= new List<WmsOrder>();
+                                                                pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = itemSku, name = itemName, qty = itemQty });
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -296,11 +329,11 @@ namespace QDM_PartNoSearch.Controllers
                                     }
                                 }
                             }
-                        }
-
-                        if (dataElement.TryGetProperty("maxpage", out var maxPageElement))
-                        {
-                            pageDataResponse.MaxPage = maxPageElement.GetInt32();
+                            //回寫api最大頁數
+                            if (dataElement.TryGetProperty("maxpage", out var maxPageElement))
+                            {
+                                pageDataResponse.MaxPage = maxPageElement.GetInt32();
+                            }
                         }
                     }
                 }
@@ -319,6 +352,8 @@ namespace QDM_PartNoSearch.Controllers
             public List<WmsProduct>? Products { get; set; }
             public List<WmsOrder>? Orders { get; set; }
             public int MaxPage { get; set; }
+            
+            public bool status {  get; set; }
         }
 
         // 將撈到的商品 list，按照 50 筆拆分出字串
@@ -352,6 +387,8 @@ namespace QDM_PartNoSearch.Controllers
             {
                 // 獲取商品資料
                 var pdData = await GetProductDataAsync();
+                // 判斷庫存狀態是否上下架
+                pdData = await GetProductStatusAsync(pdData);
                 // 獲取庫存資料並更新 pdData
                 pdData = await GetStockDataAsync(pdData);
                 // 獲取訂單資料並更新 pdData
