@@ -3,8 +3,8 @@
 }
 
 <div class="container mt-4">
-    <h3 class="mb-4">ATM退貨單查詢</h3>
     <!-- 第一個表單 - ATM -->
+    <h3 class="mb-4">ATM退貨單查詢</h3>
     <form id="dynamicForm" method="post" asp-action="Index">
         <div id="inputContainer">
             <div class="row mb-3 align-items-center">
@@ -28,9 +28,8 @@
             </div>
         </div>
     </form>
-
-    <h3 class="mb-4">批次匯出EPR退貨單報表</h3>
     <!-- 第二個表單 - ERP -->
+    <h3 class="mb-4">批次匯出EPR退貨單報表</h3>
     <form id="ERPForm" method="post" asp-action="Index">
         <div>
             <div class="row mb-3 align-items-center">
@@ -54,6 +53,31 @@
             </div>
         </div>
     </form>
+    <!-- 第三個表單 - 綠界發票 -->
+    <h3 class="mb-4">匯出綠界發票報表</h3>
+    <form id="ECpayForm" method="post" asp-action="Index">
+        <div>
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-5 mb-2 mb-md-0">
+                    <div class="d-inline-flex col-12">
+                        <div class="col-4" style="margin-top:3px;text-align:right">選擇日期</div>
+                        <div class="col-8">
+                            <input type="date" id="datepicker2" class="form-control" name="QueryDate" />
+                            <input type="hidden" name="Pandin" value="綠界" />
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-success w-100" type="submit">
+                        <i class="fa fa-file-excel"></i> 匯出綠界退貨發票報表
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <div class="col-12" style="margin-top:3px;color:red;">備註:系統只撈取單一日期</div>
+                </div>
+            </div>
+        </div>
+    </form>
 </div>
 
 <script>
@@ -61,5 +85,6 @@
         var today = new Date().toISOString().split('T')[0];  // 獲取今天的日期並格式化為 yyyy-mm-dd
         $('#datepicker').val(today);  // 設定日期欄位的值為今天
         $('#datepicker1').val(today);  // 設定日期欄位的值為今天
+        $('#datepicker2').val(today);  // 設定日期欄位的值為今天
     });
 </script>

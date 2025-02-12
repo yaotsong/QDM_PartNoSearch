@@ -15,6 +15,7 @@ using static QDM_PartNoSearch.Controllers.WmsController;
 using DocumentFormat.OpenXml.Wordprocessing;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 namespace QDM_PartNoSearch.Controllers
 {
@@ -39,9 +40,21 @@ namespace QDM_PartNoSearch.Controllers
             public string? Pandin { get; set; }
         }
         //結合ERP銷貨單頭單身欄位
-        public class CombinedCOPTGH        {
+        public class CombinedCOPTGH
+        {
             public Coptg CoptgData { get; set; }
             public Copth CopthData { get; set; }
+            public RefundReyiOrderData reyiOrderData { get; set; }
+        }
+        //存取暢流撈到的訂單資料
+        public class RefundReyiOrderData
+        {
+            public string OrderNo { get; set; }
+            public string ProductName { get; set; }
+            public int ProductPrice { get; set; }
+            public int ProductQty { get; set; }
+            public string InvoiceCode { get; set; }
+            public string InvoiceDate { get; set; }
         }
 
         public IActionResult Index()
@@ -57,6 +70,8 @@ namespace QDM_PartNoSearch.Controllers
                 var date = model.QueryDate.Value;
                 var check = model.Pandin;
                 byte[] fileContent = null;
+                List<RefundReyiOrderData> reyiListData;
+                List<CombinedCOPTGH> erpRefundData;
                 switch (check)
                 {
                     case "ATM":
@@ -64,9 +79,15 @@ namespace QDM_PartNoSearch.Controllers
                         break;
                     case "ERP":
                         //取得日翊退貨單資料
-                        var reyiListData = await ReyiRefundData(date);
-                        var erpRefundData = await erpPurchaseOrder(reyiListData,date);
-                        fileContent = await GetERPExcelData(erpRefundData); 
+                        reyiListData = await ReyiRefundData(date);
+                        erpRefundData = erpPurchaseOrder(reyiListData,date, check);
+                        fileContent = GetERPExcelData(erpRefundData); 
+                        break;
+                    case "綠界":
+                        //取得日翊退貨單資料
+                        reyiListData = await ReyiRefundData(date);
+                        erpRefundData = erpPurchaseOrder(reyiListData, date, check);
+                        fileContent = GetECpayExcelData(erpRefundData);
                         break;
                     default:
                         break;
@@ -76,7 +97,7 @@ namespace QDM_PartNoSearch.Controllers
                 // 如果沒有資料，回傳 BadRequest 或根據需求處理
                 if (fileContent == null)
                 {
-                    _logger.LogDebug("未找到符合條件的資料。");
+                    _logger.LogDebug("EXCEL匯出未找到符合條件的資料。");
                     return BadRequest("未找到符合條件的資料，請返回上一頁。");
                 }
 
@@ -87,11 +108,136 @@ namespace QDM_PartNoSearch.Controllers
 
             return View("Index", model);
         }
+        
+        //呼叫日翊暢流已退貨訂單資料
+        public async Task<List<RefundReyiOrderData>> ReyiRefundData(DateTime queryDate)
+        {
+            //轉換日期格式
+            var date = queryDate.ToString("yyyy/MM/dd");
+            //撈取日翊暢流的退貨訂單
+            var url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage=1&pagesize=20&status=R&order_date={date}";
+            if (!_cache.TryGetValue("ReyiAccessToken", out string? accessToken))
+            {
+                _logger.LogError("快取中找不到存取令牌:ReyiAccessToken");
+                return null;
+            };
+            try
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                var response = await _httpClient.GetAsync(url);
+                _logger.LogInformation("API呼叫成功:{Response}", accessToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("API 呼叫失敗: {ReasonPhrase}", response.ReasonPhrase);
+                    return null;
+                }
+                //存取退貨訂單單號
+                List<RefundReyiOrderData> orderNoList = new List<RefundReyiOrderData>();
+                var content = await response.Content.ReadAsStringAsync();
+                using (var doc = JsonDocument.Parse(content))
+                {
+                    var dataElement = doc.RootElement.GetProperty("data");
+                    if (dataElement.ValueKind == JsonValueKind.Object)
+                    {
+                        var rowsElement = dataElement.GetProperty("rows");
+                        if (rowsElement.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var row in rowsElement.EnumerateArray())
+                            {
+                                var orderData = row.GetProperty("order_no").GetString();
+                                //var totalPrice = row.GetProperty("total_price").GetInt32();
+                                //只抓訂單號後10碼
+                                var orderNo = orderData.Substring(orderData.Length - 10);
+                                var productElement = row.GetProperty("products");
+                                if (productElement.ValueKind == JsonValueKind.Array)
+                                {
+                                    foreach (var product in productElement.EnumerateArray())
+                                    {
+                                        var productName = product.GetProperty("name").GetString();
+                                        var productPrice = product.GetProperty("price").GetInt32();
+                                        var productQty = product.GetProperty("qty").GetInt32();
+                                        orderNoList.Add(new RefundReyiOrderData { OrderNo = orderNo, ProductName = productName, ProductPrice = productPrice, ProductQty = productQty });  // 使用 Add 方法加入訂單號
+                                    }
+                                }
+                            }
+                        }
+                        
+                    }
+                }
+                return orderNoList;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError("發生 API 呼叫錯誤: {Message}", e.Message);
+                return null;
+            }
+
+        }
+        public List<CombinedCOPTGH> erpPurchaseOrder(List<RefundReyiOrderData> list, DateTime querydate, string pandin)
+        {
+            var coptgQuery = _context.Coptgs.AsNoTracking().AsQueryable();
+            var copthQuery = _context.Copths.AsNoTracking().AsQueryable();
+            List<Coptg> choiceOrder = new List<Coptg>();
+            //匯出綠界發票時一定要跟暢流賣出去的名稱一樣，所以直接抓綠界的訂單資料+ERP銷貨單的發票號碼就好
+            if (pandin == "綠界")
+            {
+                foreach (var item in list)
+                {
+                    var invoiceCode = coptgQuery
+                        .Where(x => x.TG029 == item.OrderNo)
+                        .Select(x => x.TG014)
+                        .FirstOrDefault();
+                    var invoiceDate = coptgQuery
+                        .Where(x => x.TG029 == item.OrderNo)
+                        .Select(x => x.TG021)
+                        .FirstOrDefault();
+                    item.InvoiceCode = invoiceCode;
+                    item.InvoiceDate = invoiceDate;
+                }
+                var result = (from info in list
+                              select new CombinedCOPTGH
+                              {
+                                  reyiOrderData = info,
+                              }).ToList();
+                return result;
+            }
+            //比對銷貨單備註三欄位 = 暢流退貨訂單單號
+            if (pandin == "ERP")
+            {
+                var hashSet = new HashSet<string>();
+                foreach(var item in list)
+                {
+                    var orderNo = item.OrderNo;
+                    hashSet.Add(orderNo);
+                }
+                //將銷貨單單頭記錄下來
+                choiceOrder = coptgQuery
+                .Where(x => hashSet.Contains(x.TG029))
+                .ToList();
+            
+                //先比對銷貨單單頭備註三的訂單編號在join銷貨單單身
+                if (!choiceOrder.IsNullOrEmpty()){
+                    var result = (from order in choiceOrder
+                                  join copth in copthQuery
+                                  on new { TG001 = order.TG001, TG002 = order.TG002 }
+                                  equals new { TG001 = copth.TH001, TG002 = copth.TH002 }
+                                  select new CombinedCOPTGH
+                                  {
+                                      CoptgData = order,
+                                      CopthData = copth
+                                  }).ToList();
+                    return result;
+                }
+            }
+            return null;
+
+            
+        }
         //QDM退貨單匯出EXCEL
         public async Task<byte[]> GetQDMExcelData(DateTime queryDate)
         {
             string orderUrl = "https://ecapis.qdm.cloud/api/v1/orders/return";
-            if(!_cache.TryGetValue("QDMAccessToken", out string? accessToken))
+            if (!_cache.TryGetValue("QDMAccessToken", out string? accessToken))
             {
                 _logger.LogError("快取中找不到存取令牌:QDMAccessToken");
             };
@@ -228,83 +374,8 @@ namespace QDM_PartNoSearch.Controllers
                 throw new Exception($"API 請求失敗: {response.StatusCode}");
             }
         }
-        //呼叫日翊暢流已退貨訂單資料
-        public async Task<List<string>> ReyiRefundData(DateTime queryDate)
-        {
-            //轉換日期格式
-            var date = queryDate.ToString("yyyy/MM/dd");
-            //撈取日翊暢流的退貨訂單
-            var url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage=1&pagesize=20&status=R&order_date={date}";
-            if (!_cache.TryGetValue("ReyiAccessToken", out string? accessToken))
-            {
-                _logger.LogError("快取中找不到存取令牌:ReyiAccessToken");
-                return null;
-            };
-            try
-            {
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-                var response = await _httpClient.GetAsync(url);
-                _logger.LogInformation("API呼叫成功:{Response}", accessToken);
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogError("API 呼叫失敗: {ReasonPhrase}", response.ReasonPhrase);
-                    return null;
-                }
-                //存取退貨訂單單號
-                List<string> orderNoList = new List<string>();
-                var content = await response.Content.ReadAsStringAsync();
-                using (var doc = JsonDocument.Parse(content))
-                {
-                    var dataElement = doc.RootElement.GetProperty("data");
-                    if (dataElement.ValueKind == JsonValueKind.Object)
-                    {
-                        var rowsElement = dataElement.GetProperty("rows");
-                        if (rowsElement.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var row in rowsElement.EnumerateArray())
-                            {
-                                var orderData = row.GetProperty("order_no").GetString();
-                                //只抓訂單號後10碼
-                                var orderNo = orderData.Substring(orderData.Length - 10);
-                                orderNoList.Add(orderNo);  // 使用 Add 方法加入訂單號
-                            }
-                        }
-                    }
-                }
-                return orderNoList;
-            }
-            catch (Exception e)
-            {
-                _logger.LogError("發生 API 呼叫錯誤: {Message}", e.Message);
-                return null;
-            }
-
-        }
-        public async Task<List<CombinedCOPTGH>> erpPurchaseOrder(List<string> list, DateTime querydate)
-        {
-            var coptgQuery= _context.Coptgs.AsNoTracking().AsQueryable();
-            var copthQuery = _context.Copths.AsNoTracking().AsQueryable();
-            var PurchaseOrder = from coptg in coptgQuery
-                                join copth in copthQuery
-                                on coptg.TG001 equals copth.TH001
-                                where coptg.TG002 == copth.TH002
-                                select new CombinedCOPTGH
-                                {
-                                    CoptgData = coptg,
-                                    CopthData = copth
-                                };
-            //比對銷貨單備註三欄位 = 暢流退貨訂單單號
-            var hashSet = new HashSet<string>(list);  
-            var result = PurchaseOrder
-                .AsEnumerable()
-                .Where(x => hashSet.Contains(x.CoptgData.TG029))
-                .ToList();
-
-
-            return result;
-        }
         //匯出ERP退貨報表
-        public async Task<byte[]> GetERPExcelData(List<CombinedCOPTGH> data)
+        public byte[] GetERPExcelData(List<CombinedCOPTGH> data)
         {
             var workbook = new XLWorkbook();
             var worksheet = workbook.Worksheets.Add("退貨單");
@@ -332,7 +403,7 @@ namespace QDM_PartNoSearch.Controllers
             foreach (var info in data)
             {
                 worksheet.Cell(row, 1).Value = info.CoptgData.TG003;
-                worksheet.Cell(row, 2).Value = info.CoptgData.TG001+"-"+info.CoptgData.TG002;
+                worksheet.Cell(row, 2).Value = info.CoptgData.TG001 + "-" + info.CoptgData.TG002;
                 worksheet.Cell(row, 3).Value = info.CoptgData.TG014;
                 worksheet.Cell(row, 4).Value = info.CoptgData.TG004;
                 worksheet.Cell(row, 5).Value = "電子商務-綠界暢流";
@@ -359,5 +430,68 @@ namespace QDM_PartNoSearch.Controllers
                 return memoryStream.ToArray();
             }
         }
+        //匯出綠界格式
+        public byte[] GetECpayExcelData(List<CombinedCOPTGH> data)
+        {
+            var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("退貨單");
+
+            worksheet.Cell(1, 1).Value = "匯入單號";
+            worksheet.Cell(1, 2).Value = "發票號碼";
+            worksheet.Cell(1, 3).Value = "發票開立";
+            worksheet.Cell(1, 4).Value = "課稅別";
+            worksheet.Cell(1, 5).Value = "同意類型";
+            worksheet.Cell(1, 6).Value = "通知類型";
+            worksheet.Cell(1, 7).Value = "通知電子信箱";
+            worksheet.Cell(1, 8).Value = "通知手機";
+            worksheet.Cell(1, 9).Value = "折讓原因";
+            worksheet.Cell(1, 10).Value = "折讓單總價";
+            worksheet.Cell(1, 11).Value = "商品名稱";
+            worksheet.Cell(1, 12).Value = "折讓數量";
+            worksheet.Cell(1, 13).Value = "商品單位";
+            worksheet.Cell(1, 14).Value = "單價";
+            int row = 2;
+            var orderCount = 0;
+            var SumPrice = 0m;
+            var invoiceNumber = "";
+            var countPrice = data
+                            .GroupBy(x => x.reyiOrderData.InvoiceCode)
+                            .Select(x=> new
+                                    {
+                                        invoiceNumber = x.Key,
+                                        SumPrice = x.Sum(i=>i.reyiOrderData.ProductPrice)
+                                    });
+            foreach (var info in data)
+            {
+                if (info.reyiOrderData.InvoiceCode != invoiceNumber)
+                {
+                    orderCount++;
+                    SumPrice = countPrice.Where(x => x.invoiceNumber == info.reyiOrderData.InvoiceCode).Select(x=>x.SumPrice).FirstOrDefault();
+                }
+                worksheet.Cell(row, 1).Value = orderCount;
+                worksheet.Cell(row, 2).Value = info.reyiOrderData.InvoiceCode == invoiceNumber  ? "" : info.reyiOrderData.InvoiceCode;
+                worksheet.Cell(row, 3).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : info.reyiOrderData.InvoiceDate;
+                worksheet.Cell(row, 4).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "1";
+                worksheet.Cell(row, 5).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "O";
+                worksheet.Cell(row, 6).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "E";
+                worksheet.Cell(row, 7).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "ec005@flavor.com.tw";
+                worksheet.Cell(row, 8).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "0912345678";
+                worksheet.Cell(row, 9).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "部份退回";
+                worksheet.Cell(row, 10).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : SumPrice;
+                worksheet.Cell(row, 11).Value = info.reyiOrderData.ProductName;
+                worksheet.Cell(row, 12).Value = info.reyiOrderData.ProductQty;
+                worksheet.Cell(row, 13).Value = "個";
+                worksheet.Cell(row, 14).Value = info.reyiOrderData.ProductPrice;
+                row++;
+                invoiceNumber = info.reyiOrderData.InvoiceCode;
+            }
+
+            using (var memoryStream = new System.IO.MemoryStream())
+            {
+                workbook.SaveAs(memoryStream);
+                return memoryStream.ToArray();
+            }
+        }
+
     }
 }

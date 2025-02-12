@@ -1,4 +1,6 @@
-﻿namespace QDM_PartNoSearch.Models
+﻿using Microsoft.Identity.Client;
+
+namespace QDM_PartNoSearch.Models
 {
     public class Coptg
     {
@@ -12,6 +14,8 @@
         public string? TG004 { get; set; }
         //發票號碼
         public string? TG014 { get; set; }
+        //發票日期
+        public string? TG021 { get; set; }
         //統一編號
         public string? TG015 { get; set; }
         //連絡電話(一)
