@@ -115,7 +115,7 @@ namespace QDM_PartNoSearch.Controllers
             //轉換日期格式
             var date = queryDate.ToString("yyyy/MM/dd");
             //撈取日翊暢流的退貨訂單
-            var url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage=1&pagesize=20&status=R&order_date={date}";
+            var url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage=1&pagesize=20&status=R&source_key=qdm&order_date={date}";
             if (!_cache.TryGetValue("ReyiAccessToken", out string? accessToken))
             {
                 _logger.LogError("快取中找不到存取令牌:ReyiAccessToken");
@@ -145,7 +145,6 @@ namespace QDM_PartNoSearch.Controllers
                             foreach (var row in rowsElement.EnumerateArray())
                             {
                                 var orderData = row.GetProperty("order_no").GetString();
-                                //var totalPrice = row.GetProperty("total_price").GetInt32();
                                 //只抓訂單號後10碼
                                 var orderNo = orderData.Substring(orderData.Length - 10);
                                 var productElement = row.GetProperty("products");
@@ -181,6 +180,7 @@ namespace QDM_PartNoSearch.Controllers
             //匯出綠界發票時一定要跟暢流賣出去的名稱一樣，所以直接抓綠界的訂單資料+ERP銷貨單的發票號碼就好
             if (pandin == "綠界")
             {
+                List<RefundReyiOrderData> dicountData = new List<RefundReyiOrderData>();
                 foreach (var item in list)
                 {
                     var invoiceCode = coptgQuery
@@ -191,9 +191,39 @@ namespace QDM_PartNoSearch.Controllers
                         .Where(x => x.TG029 == item.OrderNo)
                         .Select(x => x.TG021)
                         .FirstOrDefault();
+                    //取得單別單號
+                    var getTG001TG002 = coptgQuery
+                        .Where(x => x.TG029 == item.OrderNo)
+                        .Select(x => new { x.TG001, x.TG002 })
+                        .FirstOrDefault();
+                    var getDiscount = copthQuery
+                                      .Where(x => x.TH001 == getTG001TG002.TG001 && x.TH002 == getTG001TG002.TG002 && x.TH005 == "銷貨折扣")
+                                      .Select(x=> new { x.TH004, x.TH005, x.TH008, x.TH012 })
+                                      .FirstOrDefault();
+                    if (getDiscount != null)
+                    {
+                        // 創建 RefundReyiOrderData 物件，並賦值
+                        RefundReyiOrderData discountlist = new RefundReyiOrderData
+                        {
+                            // 假設 RefundReyiOrderData 類型有對應的屬性，你需要根據實際情況進行對應賦值
+                            InvoiceCode = invoiceCode,
+                            InvoiceDate = invoiceDate,
+                            ProductName = getDiscount.TH005,
+                            ProductQty = Convert.ToInt32(getDiscount.TH008),
+                            ProductPrice = Convert.ToInt32(getDiscount.TH012)
+                        };
+                        // 檢查 dicountData 是否已經包含相同的 InvoiceCode
+                        if (!dicountData.Any(x => x.InvoiceCode == discountlist.InvoiceCode))
+                        {
+                            dicountData.Add(discountlist);  // 如果沒有相同的 InvoiceCode，則新增
+                        }
+                    }
+                    
                     item.InvoiceCode = invoiceCode;
                     item.InvoiceDate = invoiceDate;
                 }
+                list.AddRange(dicountData);
+                list = list.OrderBy(x => x.InvoiceCode).ToList();
                 var result = (from info in list
                               select new CombinedCOPTGH
                               {
@@ -438,12 +468,12 @@ namespace QDM_PartNoSearch.Controllers
 
             worksheet.Cell(1, 1).Value = "匯入單號";
             worksheet.Cell(1, 2).Value = "發票號碼";
-            worksheet.Cell(1, 3).Value = "發票開立";
+            worksheet.Cell(1, 3).Value = "發票開立日期";
             worksheet.Cell(1, 4).Value = "課稅別";
             worksheet.Cell(1, 5).Value = "同意類型";
             worksheet.Cell(1, 6).Value = "通知類型";
             worksheet.Cell(1, 7).Value = "通知電子信箱";
-            worksheet.Cell(1, 8).Value = "通知手機";
+            worksheet.Cell(1, 8).Value = "通知手機號碼";
             worksheet.Cell(1, 9).Value = "折讓原因";
             worksheet.Cell(1, 10).Value = "折讓單總價";
             worksheet.Cell(1, 11).Value = "商品名稱";
@@ -470,12 +500,12 @@ namespace QDM_PartNoSearch.Controllers
                 }
                 worksheet.Cell(row, 1).Value = orderCount;
                 worksheet.Cell(row, 2).Value = info.reyiOrderData.InvoiceCode == invoiceNumber  ? "" : info.reyiOrderData.InvoiceCode;
-                worksheet.Cell(row, 3).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : info.reyiOrderData.InvoiceDate;
+                worksheet.Cell(row, 3).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : DateTime.ParseExact(info.reyiOrderData.InvoiceDate,"yyyyMMdd",null).ToString("yyyy/M/d");
                 worksheet.Cell(row, 4).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "1";
                 worksheet.Cell(row, 5).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "O";
                 worksheet.Cell(row, 6).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "E";
                 worksheet.Cell(row, 7).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "ec005@flavor.com.tw";
-                worksheet.Cell(row, 8).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "0912345678";
+                worksheet.Cell(row, 8).Value = "";
                 worksheet.Cell(row, 9).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "部份退回";
                 worksheet.Cell(row, 10).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : SumPrice;
                 worksheet.Cell(row, 11).Value = info.reyiOrderData.ProductName;
