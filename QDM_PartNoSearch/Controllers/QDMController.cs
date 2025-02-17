@@ -372,18 +372,19 @@ namespace QDM_PartNoSearch.Controllers
                 worksheet.Cell(1, 7).Value = "金額";
 
                 int row = 2;
-                foreach (var data in extractedData)
-                {
-                    worksheet.Cell(row, 1).Value = data["order_id"];
-                    worksheet.Cell(row, 2).Value = data["bank_id"];
-                    worksheet.Cell(row, 3).Value = data["bank_name"];
-                    worksheet.Cell(row, 4).Value = data["bank_branch"];
-                    worksheet.Cell(row, 5).Value = data["bank_account"];
-                    worksheet.Cell(row, 6).Value = data["bank_user"];
-                    worksheet.Cell(row, 7).Value = data["total"];
-                    row++;
+                if (!extractedData.IsNullOrEmpty()) { 
+                    foreach (var data in extractedData)
+                    {
+                        worksheet.Cell(row, 1).Value = data["order_id"];
+                        worksheet.Cell(row, 2).Value = data["bank_id"];
+                        worksheet.Cell(row, 3).Value = data["bank_name"];
+                        worksheet.Cell(row, 4).Value = data["bank_branch"];
+                        worksheet.Cell(row, 5).Value = data["bank_account"];
+                        worksheet.Cell(row, 6).Value = data["bank_user"];
+                        worksheet.Cell(row, 7).Value = data["total"];
+                        row++;
+                    }
                 }
-
                 worksheet.Column(1).Width = 12;
                 worksheet.Column(2).Width = 10;
                 worksheet.Column(3).Width = 25;
@@ -430,30 +431,31 @@ namespace QDM_PartNoSearch.Controllers
             worksheet.Cell(1, 18).Value = "收貨人";
             worksheet.Cell(1, 19).Value = "銷退原因代號";
             int row = 2;
-            foreach (var info in data)
-            {
-                worksheet.Cell(row, 1).Value = info.CoptgData.TG003;
-                worksheet.Cell(row, 2).Value = info.CoptgData.TG001 + "-" + info.CoptgData.TG002;
-                worksheet.Cell(row, 3).Value = info.CoptgData.TG014;
-                worksheet.Cell(row, 4).Value = info.CoptgData.TG004;
-                worksheet.Cell(row, 5).Value = "電子商務-綠界暢流";
-                worksheet.Cell(row, 6).Value = info.CoptgData.TG015;
-                worksheet.Cell(row, 7).Value = info.CopthData.TH004;
-                worksheet.Cell(row, 8).Value = info.CopthData.TH005;
-                worksheet.Cell(row, 9).Value = "1531";
-                worksheet.Cell(row, 10).Value = info.CopthData.TH008;
-                worksheet.Cell(row, 11).Value = info.CopthData.TH012;
-                worksheet.Cell(row, 12).Value = info.CopthData.TH013;
-                worksheet.Cell(row, 13).Value = "";
-                worksheet.Cell(row, 14).Value = info.CopthData.TH017;
-                worksheet.Cell(row, 15).Value = info.CoptgData.TG106;
-                worksheet.Cell(row, 16).Value = info.CoptgData.TG029;
-                worksheet.Cell(row, 17).Value = info.CoptgData.TG007;
-                worksheet.Cell(row, 18).Value = info.CoptgData.TG076;
-                worksheet.Cell(row, 19).Value = "RZ";
-                row++;
+            if (!data.IsNullOrEmpty()) {
+                foreach (var info in data)
+                {
+                    worksheet.Cell(row, 1).Value = info.CoptgData.TG003;
+                    worksheet.Cell(row, 2).Value = info.CoptgData.TG001 + "-" + info.CoptgData.TG002;
+                    worksheet.Cell(row, 3).Value = info.CoptgData.TG014;
+                    worksheet.Cell(row, 4).Value = info.CoptgData.TG004;
+                    worksheet.Cell(row, 5).Value = "電子商務-綠界暢流";
+                    worksheet.Cell(row, 6).Value = info.CoptgData.TG015;
+                    worksheet.Cell(row, 7).Value = info.CopthData.TH004;
+                    worksheet.Cell(row, 8).Value = info.CopthData.TH005;
+                    worksheet.Cell(row, 9).Value = "1531";
+                    worksheet.Cell(row, 10).Value = info.CopthData.TH008;
+                    worksheet.Cell(row, 11).Value = info.CopthData.TH012;
+                    worksheet.Cell(row, 12).Value = info.CopthData.TH013;
+                    worksheet.Cell(row, 13).Value = "";
+                    worksheet.Cell(row, 14).Value = info.CopthData.TH017;
+                    worksheet.Cell(row, 15).Value = info.CoptgData.TG106;
+                    worksheet.Cell(row, 16).Value = info.CoptgData.TG029;
+                    worksheet.Cell(row, 17).Value = info.CoptgData.TG007;
+                    worksheet.Cell(row, 18).Value = info.CoptgData.TG076;
+                    worksheet.Cell(row, 19).Value = "RZ";
+                    row++;
+                }
             }
-
             using (var memoryStream = new System.IO.MemoryStream())
             {
                 workbook.SaveAs(memoryStream);
@@ -491,31 +493,32 @@ namespace QDM_PartNoSearch.Controllers
                                         invoiceNumber = x.Key,
                                         SumPrice = x.Sum(i=>i.reyiOrderData.ProductPrice)
                                     });
-            foreach (var info in data)
-            {
-                if (info.reyiOrderData.InvoiceCode != invoiceNumber)
+            if(!data.IsNullOrEmpty()) { 
+                foreach (var info in data)
                 {
-                    orderCount++;
-                    SumPrice = countPrice.Where(x => x.invoiceNumber == info.reyiOrderData.InvoiceCode).Select(x=>x.SumPrice).FirstOrDefault();
+                    if (info.reyiOrderData.InvoiceCode != invoiceNumber)
+                    {
+                        orderCount++;
+                        SumPrice = countPrice.Where(x => x.invoiceNumber == info.reyiOrderData.InvoiceCode).Select(x=>x.SumPrice).FirstOrDefault();
+                    }
+                    worksheet.Cell(row, 1).Value = orderCount;
+                    worksheet.Cell(row, 2).Value = info.reyiOrderData.InvoiceCode == invoiceNumber  ? "" : info.reyiOrderData.InvoiceCode;
+                    worksheet.Cell(row, 3).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : DateTime.ParseExact(info.reyiOrderData.InvoiceDate,"yyyyMMdd",null).ToString("yyyy/M/d");
+                    worksheet.Cell(row, 4).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "1";
+                    worksheet.Cell(row, 5).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "O";
+                    worksheet.Cell(row, 6).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "E";
+                    worksheet.Cell(row, 7).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "ec005@flavor.com.tw";
+                    worksheet.Cell(row, 8).Value = "";
+                    worksheet.Cell(row, 9).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "退貨";
+                    worksheet.Cell(row, 10).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : SumPrice;
+                    worksheet.Cell(row, 11).Value = info.reyiOrderData.ProductName;
+                    worksheet.Cell(row, 12).Value = info.reyiOrderData.ProductQty;
+                    worksheet.Cell(row, 13).Value = "個";
+                    worksheet.Cell(row, 14).Value = info.reyiOrderData.ProductPrice;
+                    row++;
+                    invoiceNumber = info.reyiOrderData.InvoiceCode;
                 }
-                worksheet.Cell(row, 1).Value = orderCount;
-                worksheet.Cell(row, 2).Value = info.reyiOrderData.InvoiceCode == invoiceNumber  ? "" : info.reyiOrderData.InvoiceCode;
-                worksheet.Cell(row, 3).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : DateTime.ParseExact(info.reyiOrderData.InvoiceDate,"yyyyMMdd",null).ToString("yyyy/M/d");
-                worksheet.Cell(row, 4).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "1";
-                worksheet.Cell(row, 5).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "O";
-                worksheet.Cell(row, 6).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "E";
-                worksheet.Cell(row, 7).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "ec005@flavor.com.tw";
-                worksheet.Cell(row, 8).Value = "";
-                worksheet.Cell(row, 9).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "退貨";
-                worksheet.Cell(row, 10).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : SumPrice;
-                worksheet.Cell(row, 11).Value = info.reyiOrderData.ProductName;
-                worksheet.Cell(row, 12).Value = info.reyiOrderData.ProductQty;
-                worksheet.Cell(row, 13).Value = "個";
-                worksheet.Cell(row, 14).Value = info.reyiOrderData.ProductPrice;
-                row++;
-                invoiceNumber = info.reyiOrderData.InvoiceCode;
             }
-
             using (var memoryStream = new System.IO.MemoryStream())
             {
                 workbook.SaveAs(memoryStream);
