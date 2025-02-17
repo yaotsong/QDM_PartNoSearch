@@ -506,7 +506,7 @@ namespace QDM_PartNoSearch.Controllers
                 worksheet.Cell(row, 6).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "E";
                 worksheet.Cell(row, 7).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "ec005@flavor.com.tw";
                 worksheet.Cell(row, 8).Value = "";
-                worksheet.Cell(row, 9).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "部份退回";
+                worksheet.Cell(row, 9).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "退貨";
                 worksheet.Cell(row, 10).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : SumPrice;
                 worksheet.Cell(row, 11).Value = info.reyiOrderData.ProductName;
                 worksheet.Cell(row, 12).Value = info.reyiOrderData.ProductQty;
