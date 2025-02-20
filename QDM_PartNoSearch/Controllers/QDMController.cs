@@ -101,9 +101,29 @@ namespace QDM_PartNoSearch.Controllers
                     return BadRequest("未找到符合條件的資料，請返回上一頁。");
                 }
 
+                //回傳excel檔名設定
+                var ExcelName = "";
+                var fileFormat = "";
+                switch (check) {
+                    case "ATM":
+                        ExcelName = "ATM已轉帳退貨資料.xlsx";
+                        fileFormat = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                        break;
+                    case "ERP":
+                        ExcelName = "EPR批次匯入退貨格式.xlsx";
+                        fileFormat = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                        break;
+                    case "綠界":
+                        ExcelName = "invoice_折讓.xlsx";
+                        fileFormat = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                        break;
+                    default:
+                        break;
+                }
+                    
 
                 // 返回 Excel 檔案下載
-                return File(fileContent, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{check}退貨查詢結果.xlsx");
+                return File(fileContent, fileFormat, ExcelName);
             }
 
             return View("Index", model);
@@ -153,8 +173,13 @@ namespace QDM_PartNoSearch.Controllers
                                     foreach (var product in productElement.EnumerateArray())
                                     {
                                         var productName = product.GetProperty("name").GetString();
+                                        var productSpec = product.GetProperty("spec").GetString();
                                         var productPrice = product.GetProperty("price").GetInt32();
                                         var productQty = product.GetProperty("qty").GetInt32();
+                                        if (!productSpec.IsNullOrEmpty()) //判斷有沒有產品備註,如果有則產品名稱也要加上備註
+                                        {
+                                            productName = productName + " " + productSpec;
+                                        }
                                         orderNoList.Add(new RefundReyiOrderData { OrderNo = orderNo, ProductName = productName, ProductPrice = productPrice, ProductQty = productQty });  // 使用 Add 方法加入訂單號
                                     }
                                 }
@@ -473,11 +498,11 @@ namespace QDM_PartNoSearch.Controllers
             worksheet.Cell(1, 3).Value = "發票開立日期";
             worksheet.Cell(1, 4).Value = "課稅別";
             worksheet.Cell(1, 5).Value = "同意類型";
-            worksheet.Cell(1, 6).Value = "通知類型";
+            worksheet.Cell(1, 6).Value = "通知類別";
             worksheet.Cell(1, 7).Value = "通知電子信箱";
             worksheet.Cell(1, 8).Value = "通知手機號碼";
             worksheet.Cell(1, 9).Value = "折讓原因";
-            worksheet.Cell(1, 10).Value = "折讓單總價";
+            worksheet.Cell(1, 10).Value = "折讓單總金額(含稅)";
             worksheet.Cell(1, 11).Value = "商品名稱";
             worksheet.Cell(1, 12).Value = "折讓數量";
             worksheet.Cell(1, 13).Value = "商品單位";
@@ -488,23 +513,24 @@ namespace QDM_PartNoSearch.Controllers
             var invoiceNumber = "";
             var countPrice = data
                             .GroupBy(x => x.reyiOrderData.InvoiceCode)
-                            .Select(x=> new
-                                    {
-                                        invoiceNumber = x.Key,
-                                        SumPrice = x.Sum(i=>i.reyiOrderData.ProductPrice)
-                                    });
-            if(!data.IsNullOrEmpty()) { 
+                            .Select(x => new
+                            {
+                                invoiceNumber = x.Key,
+                                SumPrice = x.Sum(i => i.reyiOrderData.ProductPrice * i.reyiOrderData.ProductQty)
+                            });
+            if (!data.IsNullOrEmpty())
+            {
                 foreach (var info in data)
                 {
                     if (info.reyiOrderData.InvoiceCode != invoiceNumber)
                     {
                         orderCount++;
-                        SumPrice = countPrice.Where(x => x.invoiceNumber == info.reyiOrderData.InvoiceCode).Select(x=>x.SumPrice).FirstOrDefault();
+                        SumPrice = countPrice.Where(x => x.invoiceNumber == info.reyiOrderData.InvoiceCode).Select(x => x.SumPrice).FirstOrDefault();
                     }
                     worksheet.Cell(row, 1).Value = orderCount;
-                    worksheet.Cell(row, 2).Value = info.reyiOrderData.InvoiceCode == invoiceNumber  ? "" : info.reyiOrderData.InvoiceCode;
-                    worksheet.Cell(row, 3).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : DateTime.ParseExact(info.reyiOrderData.InvoiceDate,"yyyyMMdd",null).ToString("yyyy/M/d");
-                    worksheet.Cell(row, 4).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "1";
+                    worksheet.Cell(row, 2).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : info.reyiOrderData.InvoiceCode;
+                    worksheet.Cell(row, 3).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : DateTime.ParseExact(info.reyiOrderData.InvoiceDate, "yyyyMMdd", null).ToString("yyyy/M/d");
+                    worksheet.Cell(row, 4).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : 1;
                     worksheet.Cell(row, 5).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "O";
                     worksheet.Cell(row, 6).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "E";
                     worksheet.Cell(row, 7).Value = info.reyiOrderData.InvoiceCode == invoiceNumber ? "" : "ec005@flavor.com.tw";
