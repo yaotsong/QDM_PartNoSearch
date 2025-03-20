@@ -198,6 +198,7 @@ namespace QDM_PartNoSearch.Controllers
         }
 
 
+        //主要處理api端的呼叫並回傳資料
         private async Task<PageDataResponse> GetPageDataAsync(string apiName, int pageNumber, string skuString = "", DateTime? date = null)
         {
             DateTime effectiveDate = date ?? DateTime.Today;
@@ -381,6 +382,7 @@ namespace QDM_PartNoSearch.Controllers
             return allData;
         }
 
+        //主程式
         public async Task<IActionResult> StoreNum()
         {
             try

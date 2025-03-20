@@ -16,6 +16,7 @@ using DocumentFormat.OpenXml.Wordprocessing;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace QDM_PartNoSearch.Controllers
 {
@@ -78,14 +79,18 @@ namespace QDM_PartNoSearch.Controllers
                         fileContent = await GetQDMExcelData(date);
                         break;
                     case "ERP":
+                        //先從暢流進庫紀錄撈取退貨訂單
+                        var refundList = await FindRefundDataFromInventRecord(date);
                         //取得日翊退貨單資料
-                        reyiListData = await ReyiRefundData(date);
+                        reyiListData = await ReyiRefundData(refundList);
                         erpRefundData = erpPurchaseOrder(reyiListData,date, check);
                         fileContent = GetERPExcelData(erpRefundData); 
                         break;
                     case "綠界":
+                        //先從暢流進庫紀錄撈取退貨訂單
+                        var refundList1 = await FindRefundDataFromInventRecord(date);
                         //取得日翊退貨單資料
-                        reyiListData = await ReyiRefundData(date);
+                        reyiListData = await ReyiRefundData(refundList1);
                         erpRefundData = erpPurchaseOrder(reyiListData, date, check);
                         fileContent = GetECpayExcelData(erpRefundData);
                         break;
@@ -128,74 +133,147 @@ namespace QDM_PartNoSearch.Controllers
 
             return View("Index", model);
         }
-        
-        //呼叫日翊暢流已退貨訂單資料
-        public async Task<List<RefundReyiOrderData>> ReyiRefundData(DateTime queryDate)
+        //呼叫暢流進庫紀錄，先依照日期撈取退貨訂單
+        public async Task<List<string>> FindRefundDataFromInventRecord(DateTime queryDate)
         {
             //轉換日期格式
-            var date = queryDate.ToString("yyyy/MM/dd");
-            //撈取日翊暢流的退貨訂單
-            var url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage=1&pagesize=20&status=R&source_key=qdm&order_date={date}";
-            if (!_cache.TryGetValue("ReyiAccessToken", out string? accessToken))
+            var Year = queryDate.ToString("yyyy");
+            var Month = queryDate.ToString("%M");
+            var currentDate = queryDate.ToString("yyyy/MM/dd");
+            //讀取分頁
+            var currentPage = 1;
+            var maxPage = 1;
+
+            //存取退貨訂單單號
+            List<string> orderNoList = new List<string>();
+
+            //撈取暢流進庫紀錄
+            for (currentPage = 1; currentPage <= maxPage; currentPage++)
             {
-                _logger.LogError("快取中找不到存取令牌:ReyiAccessToken");
-                return null;
-            };
-            try
-            {
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-                var response = await _httpClient.GetAsync(url);
-                _logger.LogInformation("API呼叫成功:{Response}", accessToken);
-                if (!response.IsSuccessStatusCode)
+                var url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/inventory/stockin_record.php?y={Year}&m={Month}&nowpage={currentPage}&pagesize=100";
+                if (!_cache.TryGetValue("ReyiAccessToken", out string? accessToken))
                 {
-                    _logger.LogError("API 呼叫失敗: {ReasonPhrase}", response.ReasonPhrase);
+                    _logger.LogError("快取中找不到存取令牌:ReyiAccessToken");
                     return null;
                 }
-                //存取退貨訂單單號
-                List<RefundReyiOrderData> orderNoList = new List<RefundReyiOrderData>();
-                var content = await response.Content.ReadAsStringAsync();
-                using (var doc = JsonDocument.Parse(content))
+                ;
+                try
                 {
-                    var dataElement = doc.RootElement.GetProperty("data");
-                    if (dataElement.ValueKind == JsonValueKind.Object)
+                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                    var response = await _httpClient.GetAsync(url);
+                    _logger.LogInformation("API呼叫成功:{Response}", accessToken);
+                    if (!response.IsSuccessStatusCode)
                     {
-                        var rowsElement = dataElement.GetProperty("rows");
-                        if (rowsElement.ValueKind == JsonValueKind.Array)
+                        _logger.LogError("API 呼叫失敗: {ReasonPhrase}", response.ReasonPhrase);
+                        return null;
+                    }
+                    var content = await response.Content.ReadAsStringAsync();
+                    using (var doc = JsonDocument.Parse(content))
+                    {
+                        var dataElement = doc.RootElement.GetProperty("data");
+                        if (dataElement.ValueKind == JsonValueKind.Object)
                         {
-                            foreach (var row in rowsElement.EnumerateArray())
+                            //回寫總頁數
+                            maxPage = dataElement.GetProperty("maxpage").GetInt32();
+                            var rowsElement = dataElement.GetProperty("rows");
+                            if (rowsElement.ValueKind == JsonValueKind.Array)
                             {
-                                var orderData = row.GetProperty("order_no").GetString();
-                                //只抓訂單號後10碼
-                                var orderNo = orderData.Substring(orderData.Length - 10);
-                                var productElement = row.GetProperty("products");
-                                if (productElement.ValueKind == JsonValueKind.Array)
+                                foreach (var row in rowsElement.EnumerateArray())
                                 {
-                                    foreach (var product in productElement.EnumerateArray())
+                                    //退貨訂單號
+                                    var orderData = row.GetProperty("return_no").GetString();
+                                    //進庫類型
+                                    var typeName = row.GetProperty("type_name").GetString();
+                                    //進庫日期
+                                    var date = row.GetProperty("date").GetString();
+                                    var formattedDate = DateTime.Parse(date).ToString("yyyy/MM/dd");
+                                    //判斷進庫日期=查詢日期&進庫類型=退貨進庫
+                                    if (formattedDate == currentDate && typeName == "退貨進庫")
                                     {
-                                        var productName = product.GetProperty("name").GetString();
-                                        var productSpec = product.GetProperty("spec").GetString();
-                                        var productPrice = product.GetProperty("price").GetInt32();
-                                        var productQty = product.GetProperty("qty").GetInt32();
-                                        if (!productSpec.IsNullOrEmpty()) //判斷有沒有產品備註,如果有則產品名稱也要加上備註
-                                        {
-                                            productName = productName + " " + productSpec;
-                                        }
-                                        orderNoList.Add(new RefundReyiOrderData { OrderNo = orderNo, ProductName = productName, ProductPrice = productPrice, ProductQty = productQty });  // 使用 Add 方法加入訂單號
+                                        orderNoList.Add(orderData);
                                     }
                                 }
                             }
                         }
-                        
                     }
                 }
-                return orderNoList;
+                catch (Exception e)
+                {
+                    _logger.LogError("發生 API 呼叫錯誤: {Message}", e.Message);
+                    return null;
+                }
             }
-            catch (Exception e)
-            {
-                _logger.LogError("發生 API 呼叫錯誤: {Message}", e.Message);
-                return null;
-            }
+            return orderNoList;
+        }
 
+        //呼叫暢流已退貨訂單資料
+        public async Task<List<RefundReyiOrderData>> ReyiRefundData(List<string> Data)
+        {
+            //存取退貨訂單單號
+            List<RefundReyiOrderData> orderNoList = new List<RefundReyiOrderData>();
+            foreach (var item in Data)
+            {
+                _logger.LogInformation("退貨訂單號:{OrderNo}", item);
+                //撈取暢流的退貨訂單
+                var url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage=1&pagesize=20&status=R&source_key=qdm&order_no={item}";
+                if (!_cache.TryGetValue("ReyiAccessToken", out string? accessToken))
+                {
+                    _logger.LogError("快取中找不到存取令牌:ReyiAccessToken");
+                    return null;
+                }
+                ;
+                try
+                {
+                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                    var response = await _httpClient.GetAsync(url);
+                    _logger.LogInformation("API呼叫成功:{Response}", accessToken);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        _logger.LogError("API 呼叫失敗: {ReasonPhrase}", response.ReasonPhrase);
+                        return null;
+                    }
+                    var content = await response.Content.ReadAsStringAsync();
+                    using (var doc = JsonDocument.Parse(content))
+                    {
+                        var dataElement = doc.RootElement.GetProperty("data");
+                        if (dataElement.ValueKind == JsonValueKind.Object)
+                        {
+                            var rowsElement = dataElement.GetProperty("rows");
+                            if (rowsElement.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var row in rowsElement.EnumerateArray())
+                                {
+                                    var orderData = row.GetProperty("order_no").GetString();
+                                    //只抓訂單號後10碼
+                                    var orderNo = orderData.Substring(orderData.Length - 10);
+                                    var productElement = row.GetProperty("products");
+                                    if (productElement.ValueKind == JsonValueKind.Array)
+                                    {
+                                        foreach (var product in productElement.EnumerateArray())
+                                        {
+                                            var productName = product.GetProperty("name").GetString();
+                                            var productSpec = product.GetProperty("spec").GetString();
+                                            var productPrice = product.GetProperty("price").GetInt32();
+                                            var productQty = product.GetProperty("qty").GetInt32();
+                                            if (!productSpec.IsNullOrEmpty()) //判斷有沒有產品備註,如果有則產品名稱也要加上備註
+                                            {
+                                                productName = productName + " " + productSpec;
+                                            }
+                                            orderNoList.Add(new RefundReyiOrderData { OrderNo = orderNo, ProductName = productName, ProductPrice = productPrice, ProductQty = productQty });  // 使用 Add 方法加入訂單號
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError("發生 API 呼叫錯誤: {Message}", e.Message);
+                    return null;
+                }
+            }
+            return orderNoList;
         }
         public List<CombinedCOPTGH> erpPurchaseOrder(List<RefundReyiOrderData> list, DateTime querydate, string pandin)
         {
