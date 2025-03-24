@@ -5,65 +5,103 @@
 
 <div class="container mt-4">
     <h3 class="mb-4">商品庫存和訂單明細</h3>
-    <div class="table-container">
-        <table class="display" id="table_id">
-            <thead>
-                <tr>
-                    <th>商品編號</th>
-                    <th>ERP品號</th>
-                    <th>商品名稱</th>
-                    <th>現有庫存</th>
-                    <th>訂單需求數量</th>
-                    <th>實際庫存數量</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var product in Model)
-                {
-                    // 計算實際庫存數量
-                    var actualStock = product.Stock - product.Qty;
-                    // 根據實際庫存數量設定 CSS 類
-                    var rowStyle = actualStock < 0 ? "color:red" : "";
 
-                    <tr style="@rowStyle">
-                        <td>@product.Id</td>
-                        <td>@product.PartNo</td>
-                        <td>@product.Name</td>
-                        <td>@product.Stock</td>
-                        <td>@product.Qty</td>
-                        <td>@actualStock</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    <!-- 頁籤功能 -->
+    <ul class="nav nav-tabs" id="inventoryTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="shopee-tab" data-bs-toggle="tab" data-bs-target="#shopee" type="button" role="tab">蝦皮倉</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="official-tab" data-bs-toggle="tab" data-bs-target="#official" type="button" role="tab">官網</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="inventoryTabsContent">
+        <!-- 蝦皮倉的庫存表格 -->
+        <div class="tab-pane fade show active" id="shopee" role="tabpanel">
+            <div class="table-container mt-3">
+                <table class="display" id="shopee_table">
+                    <thead>
+                        <tr>
+                            <th>商品編號</th>
+                            <th>ERP品號</th>
+                            <th>商品名稱</th>
+                            <th>現有庫存</th>
+                            <th>訂單需求數量</th>
+                            <th>實際庫存數量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var product in Model.Where(p => p.Warehouse == "Shopee"))
+                        {
+                            var actualStock = product.Stock - product.Qty;
+                            var rowStyle = actualStock < 0 ? "color:red" : "";
+                            <tr style="@rowStyle">
+                                <td>@product.Id</td>
+                                <td>@product.PartNo</td>
+                                <td>@product.Name</td>
+                                <td>@product.Stock</td>
+                                <td>@product.Qty</td>
+                                <td>@actualStock</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 官網的庫存表格 -->
+        <div class="tab-pane fade" id="official" role="tabpanel">
+            <div class="table-container mt-3">
+                <table class="display" id="official_table">
+                    <thead>
+                        <tr>
+                            <th>商品編號</th>
+                            <th>ERP品號</th>
+                            <th>商品名稱</th>
+                            <th>現有庫存</th>
+                            <th>訂單需求數量</th>
+                            <th>實際庫存數量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var product in Model.Where(p => p.Warehouse == "Official"))
+                        {
+                            var actualStock = product.Stock - product.Qty;
+                            var rowStyle = actualStock < 0 ? "color:red" : "";
+                            <tr style="@rowStyle">
+                                <td>@product.Id</td>
+                                <td>@product.PartNo</td>
+                                <td>@product.Name</td>
+                                <td>@product.Stock</td>
+                                <td>@product.Qty</td>
+                                <td>@actualStock</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
+
 <script>
     $(document).ready(function () {
-        $('#table_id').DataTable({
+        $('#shopee_table, #official_table').DataTable({
             language: {
                 "lengthMenu": "顯示 _MENU_ 筆資料",
                 "sProcessing": "處理中...",
                 "sZeroRecords": "没有匹配结果",
                 "sInfo": "目前有 _MAX_ 筆資料",
                 "sInfoEmpty": "目前共有 0 筆紀錄",
-                "sInfoFiltered": " ",
-                "sInfoPostFix": "",
                 "sSearch": "搜尋:",
-                "sUrl": "",
                 "sEmptyTable": "尚未有資料紀錄存在",
                 "sLoadingRecords": "載入資料中...",
-                "sInfoThousands": ",",
                 "oPaginate": {
                     "sFirst": "首頁",
                     "sPrevious": "上一頁",
                     "sNext": "下一頁",
                     "sLast": "末頁"
-                },
-                "order": [[0, "desc"]],
-                "oAria": {
-                    "sSortAscending": ": 以升序排列此列",
-                    "sSortDescending": ": 以降序排列此列"
                 }
             }
         });
