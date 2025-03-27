@@ -95,26 +95,16 @@ namespace QDM_PartNoSearch.Controllers
                 }
             }
 
-            var stockDictionary = responsesList.ToDictionary(b => b.Id, b => b.Stock);
-
-            foreach (var item in data)
-            {
-                if (stockDictionary.TryGetValue(item.Id, out var stock))
-                {
-                    item.Stock = stock;
-                }
-            }
-
-            return data;
+            return responsesList;
         }
 
         // API 抓訂單資料用，並將訂單商品明細合併到商品 list
         public async Task<List<WmsProduct>> GetOrderDataAsync(List<WmsProduct> data, string market)
         {
             DateTime today = DateTime.Today;
-            // DateTime firstDayOfMonth = new DateTime(today.Year, today.Month, 1); //從當月1號開始
-            DateTime firstDayOfMonth = today.AddDays(-60); //調整訂單起始天數 從前60天開始
-            var dataDict = data.ToDictionary(item => item.Id);
+            DateTime firstDayOfMonth = today.AddDays(-60); // 調整訂單起始天數，從前 60 天開始
+
+            var dataDict = data.ToDictionary(item => $"{item.Id}-{item.Warehouse}");
             var orderAllData = new Dictionary<string, Tuple<int, string>>();
 
             do
@@ -153,22 +143,24 @@ namespace QDM_PartNoSearch.Controllers
 
                 foreach (var order in orderList)
                 {
-                    if (string.IsNullOrEmpty(order.sku))
+                    if (string.IsNullOrEmpty(order.sku) || string.IsNullOrEmpty(order.warehouse))
                     {
-                        _logger.LogWarning("Encountered an order with null or empty SKU: {OrderId}", order.sku);
+                        _logger.LogWarning("訂單缺少 SKU 或 Warehouse: {OrderId}", order.sku);
                         continue; // 跳過這筆資料，避免將 null 的 sku 加入字典
                     }
 
-                    if (orderAllData.ContainsKey(order.sku))
+                    var orderKey = $"{order.sku}-{order.warehouse}";
+
+                    if (orderAllData.ContainsKey(orderKey))
                     {
-                        var existing = orderAllData[order.sku];
+                        var existing = orderAllData[orderKey];
                         // 更新數量和名稱（名稱保留最新的）
-                        orderAllData[order.sku] = new Tuple<int, string>(existing.Item1 + order.qty, order.name);
+                        orderAllData[orderKey] = new Tuple<int, string>(existing.Item1 + order.qty, order.name);
                     }
                     else
                     {
-                        // 新增 SKU 和對應的數量及名稱
-                        orderAllData[order.sku] = new Tuple<int, string>(order.qty, order.name);
+                        // 新增 SKU+倉庫 和對應的數量及名稱
+                        orderAllData[orderKey] = new Tuple<int, string>(order.qty, order.name);
                     }
                 }
 
@@ -190,12 +182,23 @@ namespace QDM_PartNoSearch.Controllers
                 }
                 else
                 {
-                    dataDict[kvp.Key] = new WmsProduct { Id = kvp.Key, Qty = kvp.Value.Item1, Name = "(不在日翊庫存)" + kvp.Value.Item2 };
+                    var keyParts = kvp.Key.Split('-');
+                    var sku = keyParts[0];
+                    var warehouse = keyParts.Length > 1 ? keyParts[1] : "未知倉庫";
+
+                    dataDict[kvp.Key] = new WmsProduct
+                    {
+                        Id = sku,
+                        Warehouse = warehouse,
+                        Qty = kvp.Value.Item1,
+                        Name = "(不在日翊庫存)" + kvp.Value.Item2
+                    };
                 }
             }
 
             return dataDict.Values.ToList();
         }
+
 
 
         //主要處理api端的呼叫並回傳資料
@@ -208,8 +211,8 @@ namespace QDM_PartNoSearch.Controllers
                 "條件式篩選商品" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/product/pro_query.php?nowpage={pageNumber}&pagesize=100",
                 "查詢產品細節" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/product/pro_detail.php?sku={skuString}",
                 "查詢庫存" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/inventory/stock_query.php?sku={skuString}",
-                "日翊條件式篩選訂單" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,hand,shopee",
-                "暢流條件式篩選訂單" => $"https://192.168.1.100/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=P,F,W&source_key=qdm,qdm_excel,qdm_excel2",
+                "日翊條件式篩選訂單" => $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=F&source_key=qdm,qdm_excel,hand,shopee", //status訂單狀態: F代處理 P已轉單 W轉單中
+                "暢流條件式篩選訂單" => $"https://192.168.1.100/api_v1/order/order_query.php?nowpage={pageNumber}&pagesize=50&order_date={dateString}&status=F&source_key=qdm,qdm_excel,qdm_excel2",
                 _ => throw new ArgumentException("無效的 API 名稱", nameof(apiName))
             };
 
@@ -272,18 +275,55 @@ namespace QDM_PartNoSearch.Controllers
                                     }
                                     else if (apiName == "查詢庫存")
                                     {
+                                        //先紀錄料品名稱
                                         var sku = row.GetProperty("sku").GetString();   //商品編號
-                                        var stock = row.GetProperty("stock").GetInt32(); //庫存數
                                         var name = row.GetProperty("name").GetString(); //商品名稱
-                                        var occupied_stock = row.GetProperty("occupied_stock").GetInt32(); //占用庫存
-                                        pageDataResponse.Products ??= new List<WmsProduct>();
-                                        pageDataResponse.Products.Add(new WmsProduct { Id = sku, Name = name, Stock = stock });
+                                        var spacesElement = row.GetProperty("spaces");
+                                        // 使用 Dictionary 來累加相同 SKU 與 wh_id 的可用庫存
+                                        var warehouseStockMap = new Dictionary<(string, string), int>();
+                                        if (spacesElement.ValueKind == JsonValueKind.Array)
+                                        {
+                                            foreach (var spaces in spacesElement.EnumerateArray())
+                                            {
+                                                var wh_id = spaces.GetProperty("wh_id").GetString(); //倉庫編號
+                                                var stock = spaces.GetProperty("stock").GetInt32(); //庫存數
+                                                var occupied_stock = spaces.GetProperty("occupied_stock").GetInt32(); //占用庫存
+                                                // 計算可用庫存 = stock - occupied_stock
+                                                var availableStock = stock - occupied_stock;
+                                                var key = (sku, wh_id); // 使用 (sku, wh_id) 作為 Key，確保相同商品在同倉庫合併
+                                                // 如果 Dictionary 已有相同 SKU + 倉庫，則累加庫存
+                                                if (warehouseStockMap.ContainsKey(key))
+                                                {
+                                                    warehouseStockMap[key] += availableStock;
+                                                }
+                                                else
+                                                {
+                                                    warehouseStockMap[key] = availableStock;
+                                                }
+                                            }
+                                            // 將累加結果加入 pageDataResponse.Products
+                                            pageDataResponse.Products ??= new List<WmsProduct>();
+
+                                            foreach (var kvp in warehouseStockMap)
+                                            {
+                                                var (skuKey, whKey) = kvp.Key; // 解構 Tuple 取得 SKU 和倉庫名稱
+                                                pageDataResponse.Products.Add(new WmsProduct
+                                                {
+                                                    Id = sku,
+                                                    Name = name,
+                                                    Stock = kvp.Value,  // 這裡的 Stock 已經是 (stock - occupied_stock) 累加後的值
+                                                    Warehouse = whKey
+                                                });
+                                            }
+
+                                        }
                                     }
                                     else if (apiName == "日翊條件式篩選訂單" || apiName == "暢流條件式篩選訂單")
                                     {
                                         var source_key = row.GetProperty("source_key").GetString(); //來源的EC平台
                                         var statusCode = row.GetProperty("status_code").GetString(); //訂單狀態碼:F待處理/W轉單中/P轉揀貨
                                         var statusName = row.GetProperty("status_name").GetString();
+                                        var order_no = row.GetProperty("order_no").GetString();
 
                                         var productsElement = row.GetProperty("products");
                                         if (productsElement.ValueKind == JsonValueKind.Array)
@@ -309,8 +349,9 @@ namespace QDM_PartNoSearch.Controllers
                                                         //原先要判斷有沒有展開料號，但發現暢流規則很難定義 放棄顯示未展開提示，只記錄為在日翊暢流的料
                                                         if (itemsElement.GetArrayLength() == 0 && (productType == "combine" || productType == "shop"))
                                                         {
+                                                            source_key = (source_key == "qdm" || source_key == "qdm_excel") ? "富味鄉-官網" : "富味鄉-蝦皮";
                                                             pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                            pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
+                                                            pageDataResponse.Orders.Add(new WmsOrder { warehouse = source_key, status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
                                                         }
                                                         else
                                                         {
@@ -318,9 +359,13 @@ namespace QDM_PartNoSearch.Controllers
                                                             {
                                                                 var itemSku = item.GetProperty("sku").GetString();
                                                                 var itemQty = item.GetProperty("qty").GetInt32();
+                                                                if (itemQty > 0) {
+                                                                    var test = true;
+                                                                } 
                                                                 var itemName = item.GetProperty("name").GetString();
+                                                                source_key = (source_key == "qdm" || source_key == "qdm_excel") ? "富味鄉-官網" : "富味鄉-蝦皮";
                                                                 pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                                pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = itemSku, name = itemName, qty = itemQty });
+                                                                pageDataResponse.Orders.Add(new WmsOrder { warehouse = source_key, status_code = statusCode, status_name = statusName, sku = itemSku, name = itemName, qty = itemQty });
                                                             }
                                                         }
                                                     }
@@ -353,7 +398,6 @@ namespace QDM_PartNoSearch.Controllers
             public List<WmsProduct>? Products { get; set; }
             public List<WmsOrder>? Orders { get; set; }
             public int MaxPage { get; set; }
-            
             public bool status {  get; set; }
         }
 
@@ -399,7 +443,6 @@ namespace QDM_PartNoSearch.Controllers
                 pdData = await GetOrderDataAsync(pdData, "暢流"); 
                 //將INVMH品號條碼對照表 合併到list裏頭
                 pdData = MatchingPartNo(pdData);
-
                 // 返回視圖，並將 pdData 作為模型傳遞給視圖
                 return View(pdData);
             }
