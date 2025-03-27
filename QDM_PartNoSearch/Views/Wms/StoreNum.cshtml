@@ -32,7 +32,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var product in Model.Where(p => p.Warehouse == "Shopee"))
+                        @foreach (var product in Model.Where(p => p.Warehouse == "富味鄉-蝦皮"))
                         {
                             var actualStock = product.Stock - product.Qty;
                             var rowStyle = actualStock < 0 ? "color:red" : "";
@@ -65,7 +65,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var product in Model.Where(p => p.Warehouse == "Official"))
+                        @foreach (var product in Model.Where(p => p.Warehouse == "富味鄉-官網"))
                         {
                             var actualStock = product.Stock - product.Qty;
                             var rowStyle = actualStock < 0 ? "color:red" : "";
@@ -88,6 +88,15 @@
 <script>
     $(document).ready(function () {
         $('#shopee_table, #official_table').DataTable({
+            autoWidth: false, // 關閉自動調整寬度
+            columnDefs: [
+                { width: "15%", targets: 0 }, // 商品編號
+                { width: "15%", targets: 1 }, // ERP品號
+                { width: "30%", targets: 2 }, // 商品名稱
+                { width: "10%", targets: 3 }, // 現有庫存
+                { width: "10%", targets: 4 }, // 訂單需求數量
+                { width: "10%", targets: 5 }  // 實際庫存數量
+            ],
             language: {
                 "lengthMenu": "顯示 _MENU_ 筆資料",
                 "sProcessing": "處理中...",

@@ -11,5 +11,7 @@
         public int Stock {  get; set; }
         //出貨數
         public int Qty { get; set; }
+        //倉別
+        public string Warehouse { get; set; }
     }
 }
