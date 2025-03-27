@@ -320,6 +320,7 @@ namespace QDM_PartNoSearch.Controllers
                                     }
                                     else if (apiName == "日翊條件式篩選訂單" || apiName == "暢流條件式篩選訂單")
                                     {
+                                        
                                         var source_key = row.GetProperty("source_key").GetString(); //來源的EC平台
                                         var statusCode = row.GetProperty("status_code").GetString(); //訂單狀態碼:F待處理/W轉單中/P轉揀貨
                                         var statusName = row.GetProperty("status_name").GetString();
@@ -349,7 +350,7 @@ namespace QDM_PartNoSearch.Controllers
                                                         //原先要判斷有沒有展開料號，但發現暢流規則很難定義 放棄顯示未展開提示，只記錄為在日翊暢流的料
                                                         if (itemsElement.GetArrayLength() == 0 && (productType == "combine" || productType == "shop"))
                                                         {
-                                                            source_key = (source_key == "qdm" || source_key == "qdm_excel") ? "富味鄉-官網" : "富味鄉-蝦皮";
+                                                            source_key = (source_key == "qdm" || source_key == "qdm_excel" || source_key == "富味鄉-官網") ? "富味鄉-官網" : "富味鄉-蝦皮";
                                                             pageDataResponse.Orders ??= new List<WmsOrder>();
                                                             pageDataResponse.Orders.Add(new WmsOrder { warehouse = source_key, status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
                                                         }
@@ -359,11 +360,8 @@ namespace QDM_PartNoSearch.Controllers
                                                             {
                                                                 var itemSku = item.GetProperty("sku").GetString();
                                                                 var itemQty = item.GetProperty("qty").GetInt32();
-                                                                if (itemQty > 0) {
-                                                                    var test = true;
-                                                                } 
                                                                 var itemName = item.GetProperty("name").GetString();
-                                                                source_key = (source_key == "qdm" || source_key == "qdm_excel") ? "富味鄉-官網" : "富味鄉-蝦皮";
+                                                                source_key = (source_key == "qdm" || source_key == "qdm_excel" || source_key == "富味鄉-官網") ? "富味鄉-官網" : "富味鄉-蝦皮";
                                                                 pageDataResponse.Orders ??= new List<WmsOrder>();
                                                                 pageDataResponse.Orders.Add(new WmsOrder { warehouse = source_key, status_code = statusCode, status_name = statusName, sku = itemSku, name = itemName, qty = itemQty });
                                                             }
