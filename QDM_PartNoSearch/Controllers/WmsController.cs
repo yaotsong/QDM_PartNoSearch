@@ -281,41 +281,55 @@ namespace QDM_PartNoSearch.Controllers
                                         var spacesElement = row.GetProperty("spaces");
                                         // 使用 Dictionary 來累加相同 SKU 與 wh_id 的可用庫存
                                         var warehouseStockMap = new Dictionary<(string, string), int>();
-                                        if (spacesElement.ValueKind == JsonValueKind.Array)
+                                        if (spacesElement.ValueKind == JsonValueKind.Array) // 如果有儲位
                                         {
-                                            foreach (var spaces in spacesElement.EnumerateArray())
+                                            if (spacesElement.GetArrayLength() > 0) // 有儲位資料
                                             {
-                                                var wh_id = spaces.GetProperty("wh_id").GetString(); //倉庫編號
-                                                var stock = spaces.GetProperty("stock").GetInt32(); //庫存數
-                                                var occupied_stock = spaces.GetProperty("occupied_stock").GetInt32(); //占用庫存
-                                                // 計算可用庫存 = stock - occupied_stock
-                                                var availableStock = stock - occupied_stock;
-                                                var key = (sku, wh_id); // 使用 (sku, wh_id) 作為 Key，確保相同商品在同倉庫合併
-                                                // 如果 Dictionary 已有相同 SKU + 倉庫，則累加庫存
-                                                if (warehouseStockMap.ContainsKey(key))
+                                                foreach (var spaces in spacesElement.EnumerateArray())
                                                 {
-                                                    warehouseStockMap[key] += availableStock;
-                                                }
-                                                else
-                                                {
-                                                    warehouseStockMap[key] = availableStock;
+                                                    var wh_id = spaces.GetProperty("wh_id").GetString(); // 倉庫編號，預設值
+                                                    var stock = spaces.GetProperty("stock").GetInt32(); // 庫存數
+                                                    var occupied_stock = spaces.GetProperty("occupied_stock").GetInt32(); // 占用庫存
+                                                    var availableStock = stock - occupied_stock; // 可用庫存
+
+                                                    var key = (sku, wh_id);
+                                                    if (warehouseStockMap.ContainsKey(key))
+                                                    {
+                                                        warehouseStockMap[key] += availableStock;
+                                                    }
+                                                    else
+                                                    {
+                                                        warehouseStockMap[key] = availableStock;
+                                                    }
                                                 }
                                             }
-                                            // 將累加結果加入 pageDataResponse.Products
-                                            pageDataResponse.Products ??= new List<WmsProduct>();
-
-                                            foreach (var kvp in warehouseStockMap)
+                                            else // 空陣列：沒有任何倉庫資料
                                             {
-                                                var (skuKey, whKey) = kvp.Key; // 解構 Tuple 取得 SKU 和倉庫名稱
-                                                pageDataResponse.Products.Add(new WmsProduct
+                                                // 在這裡處理空陣列的情況，例如設定預設值、記錄 log、加入預設倉庫等等
+                                                var key = (sku, "富味鄉-官網"); // 預設倉庫名稱
+                                                var key2 = (sku, "富味鄉-蝦皮"); // 預設倉庫名稱
+                                                if (!warehouseStockMap.ContainsKey(key))
                                                 {
-                                                    Id = sku,
-                                                    Name = name,
-                                                    Stock = kvp.Value,  // 這裡的 Stock 已經是 (stock - occupied_stock) 累加後的值
-                                                    Warehouse = whKey
-                                                });
+                                                    warehouseStockMap[key] = 0;
+                                                }
+                                                if (!warehouseStockMap.ContainsKey(key2))
+                                                {
+                                                    warehouseStockMap[key2] = 0;
+                                                }
                                             }
-
+                                        }
+                                        // 將累加結果加入 pageDataResponse.Products
+                                        pageDataResponse.Products ??= new List<WmsProduct>();
+                                        foreach (var kvp in warehouseStockMap)
+                                        {
+                                            var (skuKey, whKey) = kvp.Key; // 解構 Tuple 取得 SKU 和倉庫名稱
+                                            pageDataResponse.Products.Add(new WmsProduct
+                                            {
+                                                Id = sku,
+                                                Name = name,
+                                                Stock = kvp.Value,  // 這裡的 Stock 已經是 (stock - occupied_stock) 累加後的值
+                                                Warehouse = whKey
+                                            });
                                         }
                                     }
                                     else if (apiName == "日翊條件式篩選訂單" || apiName == "暢流條件式篩選訂單")
