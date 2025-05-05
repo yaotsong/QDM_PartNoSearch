@@ -375,7 +375,7 @@ namespace QDM_PartNoSearch.Controllers
                                                                 var itemSku = item.GetProperty("sku").GetString();
                                                                 var itemQty = item.GetProperty("qty").GetInt32();
                                                                 var itemName = item.GetProperty("name").GetString();
-                                                                source_key = (source_key == "qdm" || source_key == "qdm_excel" || source_key == "富味鄉-官網") ? "富味鄉-官網" : "富味鄉-蝦皮";
+                                                                source_key = (source_key == "qdm" || source_key == "qdm_excel" || source_key == "qdm_excel2" || source_key == "富味鄉-官網") ? "富味鄉-官網" : "富味鄉-蝦皮";
                                                                 pageDataResponse.Orders ??= new List<WmsOrder>();
                                                                 pageDataResponse.Orders.Add(new WmsOrder { warehouse = source_key, status_code = statusCode, status_name = statusName, sku = itemSku, name = itemName, qty = itemQty });
                                                             }
