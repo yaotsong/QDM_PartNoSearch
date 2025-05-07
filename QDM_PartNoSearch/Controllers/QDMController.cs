@@ -108,19 +108,16 @@ namespace QDM_PartNoSearch.Controllers
 
                 //回傳excel檔名設定
                 var ExcelName = "";
-                var fileFormat = "";
+                var fileFormat = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
                 switch (check) {
                     case "ATM":
                         ExcelName = "ATM已轉帳退貨資料.xlsx";
-                        fileFormat = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
                         break;
                     case "ERP":
                         ExcelName = "EPR批次匯入退貨格式.xlsx";
-                        fileFormat = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
                         break;
                     case "綠界":
                         ExcelName = "invoice_折讓.xlsx";
-                        fileFormat = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
                         break;
                     default:
                         break;
@@ -215,7 +212,7 @@ namespace QDM_PartNoSearch.Controllers
             {
                 _logger.LogInformation("退貨訂單號:{OrderNo}", item);
                 //撈取暢流的退貨訂單
-                var url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage=1&pagesize=20&status=R&source_key=qdm&order_no={item}";
+                var url = $"https://reyi-distribution.wms.changliu.com.tw/api_v1/order/order_query.php?nowpage=1&pagesize=20&status=R&source_key=qdm,qdm_excel&order_no={item}";
                 if (!_cache.TryGetValue("ReyiAccessToken", out string? accessToken))
                 {
                     _logger.LogError("快取中找不到存取令牌:ReyiAccessToken");
