@@ -281,28 +281,36 @@ namespace QDM_PartNoSearch.Controllers
             if (pandin == "綠界")
             {
                 List<RefundReyiOrderData> dicountData = new List<RefundReyiOrderData>();
+                List<RefundReyiOrderData> fareData = new List<RefundReyiOrderData>();
                 foreach (var item in list)
                 {
                     var invoiceCode = coptgQuery
-                        .Where(x => x.TG029 == item.OrderNo)
+                        .Where(x => x.TG029.Length >= 10 && x.TG029.Substring(x.TG029.Length - 10, 10) == item.OrderNo)
                         .Select(x => x.TG014)
                         .FirstOrDefault();
                     var invoiceDate = coptgQuery
-                        .Where(x => x.TG029 == item.OrderNo)
+                        .Where(x => x.TG029.Length >= 10 && x.TG029.Substring(x.TG029.Length - 10, 10) == item.OrderNo)
                         .Select(x => x.TG021)
                         .FirstOrDefault();
                     //取得單別單號
                     var getTG001TG002 = coptgQuery
-                        .Where(x => x.TG029 == item.OrderNo)
+                        .Where(x => x.TG029.Length >= 10 && x.TG029.Substring(x.TG029.Length - 10, 10) == item.OrderNo)
                         .Select(x => new { x.TG001, x.TG002 })
                         .FirstOrDefault();
+                    //取得是否有銷貨折扣
                     var getDiscount = copthQuery
                                       .Where(x => x.TH001 == getTG001TG002.TG001 && x.TH002 == getTG001TG002.TG002 && x.TH005 == "銷貨折扣")
                                       .Select(x=> new { x.TH004, x.TH005, x.TH008, x.TH012 })
                                       .FirstOrDefault();
+                    //取得是否有運費
+                    var getFare = copthQuery
+                                      .Where(x => x.TH001 == getTG001TG002.TG001 && x.TH002 == getTG001TG002.TG002 && x.TH005 == "運費")
+                                      .Select(x => new { x.TH004, x.TH005, x.TH008, x.TH012 })
+                                      .FirstOrDefault();
+                    //如果有銷貨折扣
                     if (getDiscount != null)
                     {
-                        // 創建 RefundReyiOrderData 物件，並賦值
+                        // 創建 RefundReyiOrderData 物件，並賦值 新增銷貨折扣金額及數量
                         RefundReyiOrderData discountlist = new RefundReyiOrderData
                         {
                             // 假設 RefundReyiOrderData 類型有對應的屬性，你需要根據實際情況進行對應賦值
@@ -318,11 +326,31 @@ namespace QDM_PartNoSearch.Controllers
                             dicountData.Add(discountlist);  // 如果沒有相同的 InvoiceCode，則新增
                         }
                     }
-                    
+                    //如果有運費
+                    if (getFare != null)
+                    {
+                        // 創建 RefundReyiOrderData 物件，並賦值 新增銷貨折扣金額及數量
+                        RefundReyiOrderData farelist = new RefundReyiOrderData
+                        {
+                            // 假設 RefundReyiOrderData 類型有對應的屬性，你需要根據實際情況進行對應賦值
+                            InvoiceCode = invoiceCode,
+                            InvoiceDate = invoiceDate,
+                            ProductName = getFare.TH005,
+                            ProductQty = Convert.ToInt32(getFare.TH008),
+                            ProductPrice = Convert.ToInt32(getFare.TH012)
+                        };
+                        // 檢查 dicountData 是否已經包含相同的 InvoiceCode
+                        if (!fareData.Any(x => x.InvoiceCode == farelist.InvoiceCode))
+                        {
+                            fareData.Add(farelist);  // 如果沒有相同的 InvoiceCode，則新增
+                        }
+                    }
+
                     item.InvoiceCode = invoiceCode;
                     item.InvoiceDate = invoiceDate;
                 }
                 list.AddRange(dicountData);
+                list.AddRange(fareData);
                 list = list.OrderBy(x => x.InvoiceCode).ToList();
                 var result = (from info in list
                               select new CombinedCOPTGH
