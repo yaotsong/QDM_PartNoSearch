@@ -55,7 +55,7 @@ namespace QDM_PartNoSearch.Services
                 // 刷新暢流 API 的存取令牌
                 await RefreshTokenForApi(
                     httpClient,
-                    "https://192.168.1.100/api_v1/token/authorize.php",
+                    "https://flavor.wms.changliu.com.tw/api_v1/token/authorize.php",//網址變更0806
                     _flavorApiId,
                     _flavorApiKey,
                     "FlavorAccessToken",
