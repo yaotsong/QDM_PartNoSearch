@@ -105,7 +105,7 @@ namespace QDM_PartNoSearch.Controllers
             DateTime firstDayOfMonth = today.AddDays(-60); // 調整訂單起始天數，從前 60 天開始
 
             var dataDict = data.ToDictionary(item => $"{item.Id}-{item.Warehouse}");
-            var orderAllData = new Dictionary<string, Tuple<int, string>>();
+            var orderAllData = new Dictionary<string, Tuple<int, string, string>>();//新增貨號
 
             do
             {
@@ -155,12 +155,12 @@ namespace QDM_PartNoSearch.Controllers
                     {
                         var existing = orderAllData[orderKey];
                         // 更新數量和名稱（名稱保留最新的）
-                        orderAllData[orderKey] = new Tuple<int, string>(existing.Item1 + order.qty, order.name);
+                        orderAllData[orderKey] = new Tuple<int, string, string>(existing.Item1 + order.qty, order.name, order.item_no);//新增貨號
                     }
                     else
                     {
                         // 新增 SKU+倉庫 和對應的數量及名稱
-                        orderAllData[orderKey] = new Tuple<int, string>(order.qty, order.name);
+                        orderAllData[orderKey] = new Tuple<int, string, string>(order.qty, order.name, order.item_no);//新增貨號
                     }
                 }
 
@@ -270,14 +270,34 @@ namespace QDM_PartNoSearch.Controllers
                                     {
                                         var id = row.GetProperty("id").GetString();
                                         var name = row.GetProperty("name").GetString();
+                                        var spec = row.GetProperty("spec");//取得貨號
+                                        string item_no = null;
+                                        if (spec.ValueKind == JsonValueKind.Array && spec.GetArrayLength() > 0)
+                                        {
+                                            var firstItem = spec[0]; 
+                                            if (firstItem.TryGetProperty("item_no", out var Item))
+                                            {
+                                                // 可能是 null
+                                                if (Item.ValueKind == JsonValueKind.Null)
+                                                {
+                                                    item_no = null;
+                                                }
+                                                else if (Item.ValueKind == JsonValueKind.String)
+                                                {
+                                                    item_no = Item.GetString();
+
+                                                }
+                                            }
+                                        }
                                         pageDataResponse.Products ??= new List<WmsProduct>();
-                                        pageDataResponse.Products.Add(new WmsProduct { Id = id, Name = name });
+                                        pageDataResponse.Products.Add(new WmsProduct { Id = id, Name = name, item_no = item_no });//新增貨號
                                     }
                                     else if (apiName == "查詢庫存")
                                     {
                                         //先紀錄料品名稱
                                         var sku = row.GetProperty("sku").GetString();   //商品編號
                                         var name = row.GetProperty("name").GetString(); //商品名稱
+                                        var item_no = row.GetProperty("item_no").GetString(); ;//取得貨號
                                         var spacesElement = row.GetProperty("spaces");
                                         // 使用 Dictionary 來累加相同 SKU 與 wh_id 的可用庫存
                                         var warehouseStockMap = new Dictionary<(string, string), int>();
@@ -327,6 +347,7 @@ namespace QDM_PartNoSearch.Controllers
                                             {
                                                 Id = sku,
                                                 Name = name,
+                                                item_no = item_no,//新增貨號
                                                 Stock = kvp.Value,  // 這裡的 Stock 已經是 (stock - occupied_stock) 累加後的值
                                                 Warehouse = whKey
                                             });
@@ -349,11 +370,12 @@ namespace QDM_PartNoSearch.Controllers
                                                 var sku = product.GetProperty("sku").GetString();
                                                 var qty = product.GetProperty("qty").GetInt32();
                                                 var name = product.GetProperty("name").GetString();
+                                                var item_no = product.GetProperty("item_no").GetString();//新增貨號
 
                                                 if (source_key == "hand") // 人工開單不用到items層
                                                 {
                                                     pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                    pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
+                                                    pageDataResponse.Orders.Add(new WmsOrder { status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty, item_no = item_no });//新增貨號
                                                 }
                                                 else
                                                 {
@@ -366,7 +388,7 @@ namespace QDM_PartNoSearch.Controllers
                                                         {
                                                             source_key = (source_key == "qdm" || source_key == "qdm_excel" || source_key == "富味鄉-官網") ? "富味鄉-官網" : "富味鄉-蝦皮";
                                                             pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                            pageDataResponse.Orders.Add(new WmsOrder { warehouse = source_key, status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty });
+                                                            pageDataResponse.Orders.Add(new WmsOrder { warehouse = source_key, status_code = statusCode, status_name = statusName, sku = sku, name = name, qty = qty, item_no = item_no });//新增貨號
                                                         }
                                                         else
                                                         {
@@ -375,9 +397,10 @@ namespace QDM_PartNoSearch.Controllers
                                                                 var itemSku = item.GetProperty("sku").GetString();
                                                                 var itemQty = item.GetProperty("qty").GetInt32();
                                                                 var itemName = item.GetProperty("name").GetString();
+                                                                var itemNo = item.GetProperty("item_no").GetString();//新增貨號
                                                                 source_key = (source_key == "qdm" || source_key == "qdm_excel" || source_key == "qdm_excel2" || source_key == "富味鄉-官網") ? "富味鄉-官網" : "富味鄉-蝦皮";
                                                                 pageDataResponse.Orders ??= new List<WmsOrder>();
-                                                                pageDataResponse.Orders.Add(new WmsOrder { warehouse = source_key, status_code = statusCode, status_name = statusName, sku = itemSku, name = itemName, qty = itemQty });
+                                                                pageDataResponse.Orders.Add(new WmsOrder { warehouse = source_key, status_code = statusCode, status_name = statusName, sku = itemSku, name = itemName, qty = itemQty, item_no = itemNo });//新增貨號
                                                             }
                                                         }
                                                     }
@@ -429,10 +452,25 @@ namespace QDM_PartNoSearch.Controllers
             var Invmhs = _context.Invmhs.ToList();
             foreach (var item in allData)
             {
-                var matchingData = Invmhs.FirstOrDefault(x => x.MH002.Trim() == item.Id);
-                if(matchingData != null)
+                // 為避免有條碼一對多個料號的情況發生，先取得所有符合 MH002 的項目
+                var candidates = Invmhs.Where(x => x.MH002.Trim() == item.Id).ToList();
+
+                if (candidates.Count == 1)
                 {
-                    item.PartNo = matchingData.MH001.Trim();
+                    // 如果只有一筆，直接取用
+                    item.PartNo = candidates[0].MH001.Trim();
+                }
+                else if (candidates.Count > 1)
+                {
+                    // 多筆的話再用 item_no 做篩選
+                    if (!string.IsNullOrWhiteSpace(item.item_no))
+                    {
+                        var match = candidates.FirstOrDefault(x => x.MH001.Trim() == item.item_no.Trim());
+                        if (match != null)
+                        {
+                            item.PartNo = match.MH001.Trim();
+                        }
+                    }
                 }
             }
             return allData;

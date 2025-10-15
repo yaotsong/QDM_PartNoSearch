@@ -13,5 +13,7 @@
         public int Qty { get; set; }
         //倉別
         public string Warehouse { get; set; }
+        //貨號
+        public string item_no { get; set; }//新增貨號
     }
 }
