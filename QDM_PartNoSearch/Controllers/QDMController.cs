@@ -25,9 +25,9 @@ namespace QDM_PartNoSearch.Controllers
         private readonly HttpClient _httpClient;
         private readonly IMemoryCache _cache;
         private readonly ILogger<HomeController> _logger;
-        private readonly Flavor2Context _context;
+        private readonly GSTContext _context;
 
-        public QDMController(ILogger<HomeController> logger, IHttpClientFactory httpClientFactory, IMemoryCache cache, Flavor2Context context)
+        public QDMController(ILogger<HomeController> logger, IHttpClientFactory httpClientFactory, IMemoryCache cache, GSTContext context)
         {
             _logger = logger;
             _httpClient = httpClientFactory.CreateClient("NoCertValidationClient");

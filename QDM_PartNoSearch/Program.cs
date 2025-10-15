@@ -36,6 +36,7 @@ builder.Services.AddHttpClient("NoCertValidationClient")
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<Flavor2Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("Flavor2Context")));
+builder.Services.AddDbContext<GSTContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("GSTContext")));
 builder.Services.AddDbContext<DeanContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DeanContext")));
 
 builder.Services.AddHostedService<TokenRefreshService>();
