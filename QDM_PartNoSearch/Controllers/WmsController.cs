@@ -447,7 +447,7 @@ namespace QDM_PartNoSearch.Controllers
                 .ToList();
         }
 
-        public List<WmsProduct> MatchingPartNo (List<WmsProduct> allData)
+        public List<WmsProduct> MatchingPartNo (List<WmsProduct> allData)//對照ERP料號
         {
             var Invmhs = _context.Invmhs.ToList();
             foreach (var item in allData)
@@ -476,6 +476,25 @@ namespace QDM_PartNoSearch.Controllers
             return allData;
         }
 
+        public List<WmsProduct> MatchingName(List<WmsProduct> allData)//對照ERP品名
+        {
+            var Invmbs = _context.Invmbs.ToList();
+
+
+            foreach (var item in allData)
+            {
+
+                var matchingData = Invmbs.Where(x => x.Mb001.Trim() == item.item_no).ToList();
+                if (matchingData != null)
+                {
+                    item.Name = matchingData[0].Mb002.Trim();
+                }
+
+            }
+
+            return allData;
+        }
+
         //主程式
         public async Task<IActionResult> StoreNum()
         {
@@ -493,6 +512,8 @@ namespace QDM_PartNoSearch.Controllers
                 pdData = await GetOrderDataAsync(pdData, "暢流"); 
                 //將INVMH品號條碼對照表 合併到list裏頭
                 pdData = MatchingPartNo(pdData);
+                //將INVMB中的品名 合併到list裏頭
+                pdData = MatchingName(pdData);
                 // 返回視圖，並將 pdData 作為模型傳遞給視圖
                 return View(pdData);
             }
