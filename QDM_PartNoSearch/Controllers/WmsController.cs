@@ -485,7 +485,11 @@ namespace QDM_PartNoSearch.Controllers
             {
 
                 var matchingData = Invmbs.Where(x => x.Mb001.Trim() == item.item_no).ToList();
-                if (matchingData != null)
+                //if (matchingData != null)
+                //{
+                //    item.Name = matchingData[0].Mb002.Trim();
+                //}
+                if (matchingData.Count > 0)
                 {
                     item.Name = matchingData[0].Mb002.Trim();
                 }
